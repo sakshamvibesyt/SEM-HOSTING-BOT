@@ -22,6 +22,7 @@ _APP = None
 _MAX_BYTES = int(os.environ.get("MAX_UPLOAD_MB", "20")) * 1024 * 1024
 PANEL_URL = os.environ.get("PANEL_URL", "https://sem-hosting-bot.onrender.com/").strip()
 WELCOME_VIDEO_URL = os.environ.get("WELCOME_VIDEO_URL", "").strip()
+FORCE_JOIN_VIDEO_URL = os.environ.get("FORCE_JOIN_VIDEO_URL", "").strip()
 UPDATES_URL = os.environ.get("UPDATES_URL", "").strip()
 SUPPORT_URL = os.environ.get("SUPPORT_URL", "").strip()
 FORCE_SUB_CHANNEL = os.environ.get("FORCE_SUB_CHANNEL", "@drama_fonts").strip()
@@ -109,28 +110,58 @@ async def _is_subscribed(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         return False
     try:
         member = await context.bot.get_chat_member(FORCE_SUB_CHANNEL, user.id)
-        return member.status in ("member", "administrator", "creator")
+        return member.status in ("member", "administrator", "creator") or (member.status == "restricted" and getattr(member, "is_member", False))
     except Exception:
         log.exception("Force-join check failed for %s; confirm bot is admin in channel", FORCE_SUB_CHANNEL)
         return False
 
 
 async def _require_subscription(update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
+    """Require membership before allowing access to the hosting assistant."""
     if await _is_subscribed(update, context):
         return True
+
     keyboard = InlineKeyboardMarkup([
         [InlineKeyboardButton("📢 JOIN CHANNEL", url=FORCE_SUB_URL)],
-        [InlineKeyboardButton("🔄 I HAVE JOINED", callback_data="force:check")],
+        [InlineKeyboardButton("✅ I HAVE JOINED", callback_data="force:check")],
     ])
-    message = (
-        "📢 *Channel Join Required*\n\n"
-        "Hosting bot use karne ke liye pehle hamara official channel join karein.\n"
-        "Join karne ke baad *I HAVE JOINED* par tap karein."
+
+    # Owner mention is intentionally inside Telegram's spoiler tag.
+    caption = (
+        "╭━━━〔 🔐 CHANNEL VERIFICATION 〕━━━╮\n\n"
+        "Hey! Welcome to our Hosting Assistant. 💗\n\n"
+        "Hosting bot ka access lene ke liye pehle hamara official updates channel join karein.\n\n"
+        "📌 <b>Bas ye 3 steps follow karein:</b>\n"
+        "1️⃣ Neeche JOIN CHANNEL button par tap karein.\n"
+        "2️⃣ Channel join karne ke baad yahan wapas aayein.\n"
+        "3️⃣ I HAVE JOINED dabayein — verification complete hote hi access unlock ho jayega.\n\n"
+        "✨ Channel join karna zaroori hai, warna hosting assistant use nahi kar paoge.\n\n"
+        "👑 <b>Owner:</b> <tg-spoiler><a href=\"https://t.me/drama_404x\">@drama_404x</a></tg-spoiler>\n\n"
+        "╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯"
     )
-    if update.callback_query:
-        await update.callback_query.message.reply_text(message, reply_markup=keyboard)
-    else:
-        await update.effective_message.reply_text(message, reply_markup=keyboard)
+
+    message = update.effective_message
+    if not message:
+        return False
+
+    if FORCE_JOIN_VIDEO_URL:
+        try:
+            await message.reply_video(
+                video=FORCE_JOIN_VIDEO_URL,
+                caption=caption,
+                parse_mode="HTML",
+                reply_markup=keyboard,
+            )
+            return False
+        except Exception:
+            log.exception("Force-join video send failed; sending text fallback")
+
+    await message.reply_text(
+        caption,
+        parse_mode="HTML",
+        reply_markup=keyboard,
+        disable_web_page_preview=True,
+    )
     return False
 
 
@@ -461,112 +492,4 @@ async def control_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     act = aliases[action]
     if act == "start":
-        if bot["status"] in ("pending", "rejected"):
-            await update.effective_message.reply_text("This bot is not approved or is rejected.")
-            return
-        ok, msg, pid = botmanager.start(bot)
-    elif act == "stop":
-        ok, msg = botmanager.stop(bot)
-    else:
-        ok, msg, pid = botmanager.restart(bot)
-    await update.effective_message.reply_text(("✅ " if ok else "❌ ") + msg)
-
-
-async def logs_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user = _linked(update)
-    if not user or len(context.args) != 1 or not context.args[0].isdigit():
-        await update.effective_message.reply_text("Usage: /logs BOT_ID (login first)")
-        return
-    bot = db.get_bot(int(context.args[0]), user["id"])
-    if not bot:
-        await update.effective_message.reply_text("Bot not found.")
-        return
-    content = botmanager.read_log(int(bot["id"]), tail_lines=50) or "No logs yet."
-    await update.effective_message.reply_text(content[-3800:])
-
-
-async def files_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user = _linked(update)
-    if not user or len(context.args) != 1 or not context.args[0].isdigit():
-        await update.effective_message.reply_text("Usage: /files BOT_ID (login first)")
-        return
-    bot = db.get_bot(int(context.args[0]), user["id"])
-    if not bot:
-        await update.effective_message.reply_text("Bot not found.")
-        return
-    files = botmanager.list_bot_files(bot)
-    lines = [f"Files for {bot['name']}:"] + [
-        f"{f['name']} · {botmanager.human_size(f['size'])}" for f in files[:60]
-    ]
-    await update.effective_message.reply_text("\n".join(lines)[:4000])
-
-
-async def getfile_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user = _linked(update)
-    if not user or len(context.args) < 2 or not context.args[0].isdigit():
-        await update.effective_message.reply_text("Usage: /getfile BOT_ID relative/path.py (login first)")
-        return
-    bot = db.get_bot(int(context.args[0]), user["id"])
-    if not bot:
-        await update.effective_message.reply_text("Bot not found.")
-        return
-    relpath = " ".join(context.args[1:])
-    target = botmanager.file_for_download(bot, relpath)
-    if not target:
-        await update.effective_message.reply_text("File not found or invalid path.")
-        return
-    if os.path.getsize(target) > 45 * 1024 * 1024:
-        await update.effective_message.reply_text("File is too large to send through Telegram.")
-        return
-    with open(target, "rb") as fh:
-        await update.effective_message.reply_document(document=fh, filename=os.path.basename(target))
-
-
-def start_telegram_bot(flask_app) -> None:
-    """Start polling in a daemon thread when TELEGRAM_BOT_TOKEN is configured."""
-    token = os.environ.get("TELEGRAM_BOT_TOKEN", "").strip()
-    if not token:
-        log.info("TELEGRAM_BOT_TOKEN not set; Telegram control bot disabled")
-        return
-    global _APP
-    if _APP is not None:
-        return
-    db.init_telegram_tables()
-
-    async def runner():
-        application = Application.builder().token(token).build()
-        application.add_handler(CommandHandler("start", start_cmd))
-        application.add_handler(CommandHandler("pannel", pannel_cmd))
-        application.add_handler(CommandHandler("panel", pannel_cmd))
-        application.add_handler(CommandHandler("link", link_cmd))
-        application.add_handler(CommandHandler("unlink", unlink_cmd))
-        application.add_handler(CommandHandler("bots", bots_cmd))
-        application.add_handler(CommandHandler("upload", upload_cmd))
-        application.add_handler(CommandHandler("status", status_cmd))
-        application.add_handler(CommandHandler(["startbot", "stopbot", "restartbot"], control_cmd))
-        application.add_handler(CommandHandler("logs", logs_cmd))
-        application.add_handler(CommandHandler("files", files_cmd))
-        application.add_handler(CommandHandler("getfile", getfile_cmd))
-        application.add_handler(CallbackQueryHandler(callback_handler))
-        application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, auth_text_handler))
-        application.add_handler(MessageHandler(filters.Document.ALL, document_handler))
-        await application.initialize()
-        await application.start()
-        await application.updater.start_polling(drop_pending_updates=True)
-        try:
-            await asyncio.Event().wait()
-        finally:
-            await application.updater.stop()
-            await application.stop()
-            await application.shutdown()
-
-    def thread_main():
-        with flask_app.app_context():
-            try:
-                asyncio.run(runner())
-            except Exception:
-                log.exception("Telegram bot stopped")
-
-    thread = threading.Thread(target=thread_main, name="gxhost-telegram", daemon=True)
-    thread.start()
-    _APP = thread
+        if bot["status"] in ("pending", "r
