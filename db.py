@@ -326,6 +326,19 @@ def consume_telegram_pair_code(code: str, chat_id: int) -> int | None:
         return int(row["user_id"])
 
 
+def link_telegram_account(user_id: int, chat_id: int) -> None:
+    """Attach a Telegram chat to an existing panel account, replacing older links."""
+    with _Cursor() as con:
+        con.execute(
+            "DELETE FROM telegram_links WHERE chat_id = ? OR user_id = ?",
+            (chat_id, user_id),
+        )
+        con.execute(
+            "INSERT INTO telegram_links(chat_id, user_id, linked_at) VALUES (?, ?, ?)",
+            (chat_id, user_id, utc_now()),
+        )
+
+
 def get_user_by_telegram_chat(chat_id: int) -> sqlite3.Row | None:
     return _one("SELECT u.* FROM users u JOIN telegram_links t ON t.user_id = u.id WHERE t.chat_id = ? AND u.is_banned = 0", (chat_id,))
 

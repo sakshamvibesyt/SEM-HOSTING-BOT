@@ -224,3 +224,20 @@ Set `TELEGRAM_BOT_TOKEN` in the hosting environment. Sign in to the web panel, o
 Telegram commands: `/bots`, `/upload`, `/status BOT_ID`, `/startbot BOT_ID`, `/stopbot BOT_ID`, `/restartbot BOT_ID`, `/logs BOT_ID`, `/files BOT_ID`, `/getfile BOT_ID relative/path.py`.
 
 The Telegram bot runs in the same web-service process. Use one Gunicorn worker. This does not provide sandboxing: uploaded Python code runs with the service account's privileges. Do not expose uploads to untrusted users without adding container/user isolation and resource limits. Render Free instances sleep and have ephemeral filesystems, so they are not suitable for persistent bot hosting.
+
+
+## Telegram bot login and setup
+
+Set these environment variables on Render:
+
+- `TELEGRAM_BOT_TOKEN` — Telegram bot token from BotFather.
+- `PANEL_URL` — `https://sem-hosting-bot.onrender.com/`
+- `WELCOME_VIDEO_URL` — direct URL to the welcome video (optional).
+- `UPDATES_URL` — Telegram updates channel URL (optional).
+- `SUPPORT_URL` — Telegram support group URL (optional).
+- `OWNER_USERNAME` — `drama_404x`.
+- `OWNER_ID` — `9282845729`.
+
+In Telegram, `/start` displays Login and Sign Up. Both use the same account database as the website panel. A successful Telegram login links that Telegram chat to the matching panel account. `/pannel` (or `/panel`) sends the panel URL with an Open Panel button.
+
+For account security, the bot attempts to delete the password message after processing it. Telegram message deletion is best-effort; do not use a password that you share with other services.

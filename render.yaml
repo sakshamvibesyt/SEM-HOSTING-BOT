@@ -31,6 +31,20 @@ services:
         value: "3"
       - key: COOKIE_SECURE
         value: "1"
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
+      - key: PANEL_URL
+        value: "https://sem-hosting-bot.onrender.com/"
+      - key: WELCOME_VIDEO_URL
+        sync: false
+      - key: UPDATES_URL
+        sync: false
+      - key: SUPPORT_URL
+        sync: false
+      - key: OWNER_USERNAME
+        value: "drama_404x"
+      - key: OWNER_ID
+        value: "9282845729"
     disk:
       name: gx-data
       mountPath: /opt/render/project/src/data
