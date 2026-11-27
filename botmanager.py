@@ -283,19 +283,18 @@ _ENTRY_DIR = {entry_dir!r}
 _HERE = os.path.dirname(os.path.abspath(__file__))
 
 def _load_env(path):
-    try:
-        with open(path, "r", encoding="utf-8", errors="replace") as fh:
-            for raw in fh:
-                line = raw.strip()
-                if not line or line.startswith("#") or "=" not in line:
-                    continue
-                key, _, value = line.partition("=")
-                key = key.strip()
-                if key.startswith("export "):
-                    key = key[7:].strip()
-                if not key or key in os.environ:
-                    continue
-                os.environ[key] = value.strip().strip('"').strip("'")
+    with open(path, "r", encoding="utf-8", errors="replace") as fh:
+        for raw in fh:
+            line = raw.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            key, _, value = line.partition("=")
+            key = key.strip()
+            if key.startswith("export "):
+                key = key[7:].strip()
+            if not key or key in os.environ:
+                continue
+            os.environ[key] = value.strip().strip('"').strip("'")
 
 for _candidate in (os.path.join(_HERE, ".env"), os.path.join(_ENTRY_DIR, ".env")):
     if os.path.isfile(_candidate):
