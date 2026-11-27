@@ -65,32 +65,32 @@ def _user_keyboard():
 
 def _full_welcome(first: str) -> str:
     return (
-        "╭━━━〔 ⚡ 𝐏𝐑𝐈𝐕𝐀𝐓𝐄 𝐇𝐎𝐒𝐓𝐈𝐍𝐆 ⚡ 〕━━━╮\\n\\n"
-        "       🖤 𝐖𝐄𝐋𝐂𝐎𝐌𝐄 𝐓𝐎\\n"
-        "❛ ⤹⌯ ᯓ𓆰 𝐃 ꧊᱂ ᧘ ϻ ᧘ 𖤍 ➛🇨🇦 𝐇𝐨𝐬𝐭𝐢𝐧𝐠\\n\\n"
-        "╰━━━━━━━━━━━━━━━━━━━━━━━━━━╯\\n\\n"
-        f"⌁ 𝐀𝐂𝐂𝐄𝐒𝐒 𝐆𝐑𝐀𝐍𝐓𝐄𝐃, {first}\\n\\n"
-        "💻 Your personal hosting terminal is ready.\\n"
-        "Deploy, monitor and control your Python bots from Telegram.\\n\\n"
-        "୨୧ ━━━ 𝐒𝐘𝐒𝐓𝐄𝐌 𝐅𝐄𝐀𝐓𝐔𝐑𝐄𝐒 ━━━ ୨୧\\n\\n"
-        "⚡ Instant Bot Deployment\\n"
-        "📂 Secure File Management\\n"
-        "🖥 Live Console & Logs\\n"
-        "🔄 Start / Stop / Restart\\n"
-        "🛡 Account Authentication\\n"
-        "📊 Hosting Statistics\\n\\n"
-        "୨୧ ━━━ 𝐒𝐘𝐒𝐓𝐄𝐌 𝐎𝐖𝐍𝐄𝐑 ━━━ ୨୧\\n\\n"
-        f"👑 @{OWNER_USERNAME}\\n\\n"
+        "╭━━━〔 ⚡ 𝐏𝐑𝐈𝐕𝐀𝐓𝐄 𝐇𝐎𝐒𝐓𝐈𝐍𝐆 ⚡ 〕━━━╮\n\n"
+        "       🖤 𝐖𝐄𝐋𝐂𝐎𝐌𝐄 𝐓𝐎\n"
+        "❛ ⤹⌯ ᯓ𓆰 𝐃 ꧊᱂ ᧘ ϻ ᧘ 𖤍 ➛🇨🇦 𝐇𝐨𝐬𝐭𝐢𝐧𝐠\n\n"
+        "╰━━━━━━━━━━━━━━━━━━━━━━━━━━╯\n\n"
+        f"⌁ 𝐀𝐂𝐂𝐄𝐒𝐒 𝐆𝐑𝐀𝐍𝐓𝐄𝐃, {first}\n\n"
+        "💻 Your personal hosting terminal is ready.\n"
+        "Deploy, monitor and control your Python bots from Telegram.\n\n"
+        "୨୧ ━━━ 𝐒𝐘𝐒𝐓𝐄𝐌 𝐅𝐄𝐀𝐓𝐔𝐑𝐄𝐒 ━━━ ୨୧\n\n"
+        "⚡ Instant Bot Deployment\n"
+        "📂 Secure File Management\n"
+        "🖥 Live Console & Logs\n"
+        "🔄 Start / Stop / Restart\n"
+        "🛡 Account Authentication\n"
+        "📊 Hosting Statistics\n\n"
+        "୨୧ ━━━ 𝐒𝐘𝐒𝐓𝐄𝐌 𝐎𝐖𝐍𝐄𝐑 ━━━ ୨୧\n\n"
+        f"👑 @{OWNER_USERNAME}\n\n"
         "⌁ 𝐂𝐎𝐃𝐄 • 𝐃𝐄𝐏𝐋𝐎𝐘 • 𝐂𝐎𝐍𝐓𝐑𝐎𝐋"
     )
 
 
 def _compact_welcome(first: str) -> str:
     return (
-        "╭━━━〔 ⚡ 𝐇𝐎𝐒𝐓𝐈𝐍𝐆 𝐒𝐘𝐒𝐓𝐄𝐌 ⚡ 〕━━━╮\\n"
-        f"⌁ ACCESS GRANTED, {first}\\n"
-        "💻 Your bot deployment terminal is ready.\\n"
-        "⚡ Deploy • Manage • Monitor\\n"
+        "╭━━━〔 ⚡ 𝐇𝐎𝐒𝐓𝐈𝐍𝐆 𝐒𝐘𝐒𝐓𝐄𝐌 ⚡ 〕━━━╮\n"
+        f"⌁ ACCESS GRANTED, {first}\n"
+        "💻 Your bot deployment terminal is ready.\n"
+        "⚡ Deploy • Manage • Monitor\n"
         "╰━━━━━━━━━━━━━━━━━━━━━━━━━━╯"
     )
 
@@ -492,4 +492,112 @@ async def control_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     act = aliases[action]
     if act == "start":
-        if bot["status"] in ("pending", "r
+        if bot["status"] in ("pending", "rejected"):
+            await update.effective_message.reply_text("This bot is not approved or is rejected.")
+            return
+        ok, msg, pid = botmanager.start(bot)
+    elif act == "stop":
+        ok, msg = botmanager.stop(bot)
+    else:
+        ok, msg, pid = botmanager.restart(bot)
+    await update.effective_message.reply_text(("✅ " if ok else "❌ ") + msg)
+
+
+async def logs_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = _linked(update)
+    if not user or len(context.args) != 1 or not context.args[0].isdigit():
+        await update.effective_message.reply_text("Usage: /logs BOT_ID (login first)")
+        return
+    bot = db.get_bot(int(context.args[0]), user["id"])
+    if not bot:
+        await update.effective_message.reply_text("Bot not found.")
+        return
+    content = botmanager.read_log(int(bot["id"]), tail_lines=50) or "No logs yet."
+    await update.effective_message.reply_text(content[-3800:])
+
+
+async def files_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = _linked(update)
+    if not user or len(context.args) != 1 or not context.args[0].isdigit():
+        await update.effective_message.reply_text("Usage: /files BOT_ID (login first)")
+        return
+    bot = db.get_bot(int(context.args[0]), user["id"])
+    if not bot:
+        await update.effective_message.reply_text("Bot not found.")
+        return
+    files = botmanager.list_bot_files(bot)
+    lines = [f"Files for {bot['name']}:"] + [
+        f"{f['name']} · {botmanager.human_size(f['size'])}" for f in files[:60]
+    ]
+    await update.effective_message.reply_text("\n".join(lines)[:4000])
+
+
+async def getfile_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = _linked(update)
+    if not user or len(context.args) < 2 or not context.args[0].isdigit():
+        await update.effective_message.reply_text("Usage: /getfile BOT_ID relative/path.py (login first)")
+        return
+    bot = db.get_bot(int(context.args[0]), user["id"])
+    if not bot:
+        await update.effective_message.reply_text("Bot not found.")
+        return
+    relpath = " ".join(context.args[1:])
+    target = botmanager.file_for_download(bot, relpath)
+    if not target:
+        await update.effective_message.reply_text("File not found or invalid path.")
+        return
+    if os.path.getsize(target) > 45 * 1024 * 1024:
+        await update.effective_message.reply_text("File is too large to send through Telegram.")
+        return
+    with open(target, "rb") as fh:
+        await update.effective_message.reply_document(document=fh, filename=os.path.basename(target))
+
+
+def start_telegram_bot(flask_app) -> None:
+    """Start polling in a daemon thread when TELEGRAM_BOT_TOKEN is configured."""
+    token = os.environ.get("TELEGRAM_BOT_TOKEN", "").strip()
+    if not token:
+        log.info("TELEGRAM_BOT_TOKEN not set; Telegram control bot disabled")
+        return
+    global _APP
+    if _APP is not None:
+        return
+    db.init_telegram_tables()
+
+    async def runner():
+        application = Application.builder().token(token).build()
+        application.add_handler(CommandHandler("start", start_cmd))
+        application.add_handler(CommandHandler("pannel", pannel_cmd))
+        application.add_handler(CommandHandler("panel", pannel_cmd))
+        application.add_handler(CommandHandler("link", link_cmd))
+        application.add_handler(CommandHandler("unlink", unlink_cmd))
+        application.add_handler(CommandHandler("bots", bots_cmd))
+        application.add_handler(CommandHandler("upload", upload_cmd))
+        application.add_handler(CommandHandler("status", status_cmd))
+        application.add_handler(CommandHandler(["startbot", "stopbot", "restartbot"], control_cmd))
+        application.add_handler(CommandHandler("logs", logs_cmd))
+        application.add_handler(CommandHandler("files", files_cmd))
+        application.add_handler(CommandHandler("getfile", getfile_cmd))
+        application.add_handler(CallbackQueryHandler(callback_handler))
+        application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, auth_text_handler))
+        application.add_handler(MessageHandler(filters.Document.ALL, document_handler))
+        await application.initialize()
+        await application.start()
+        await application.updater.start_polling(drop_pending_updates=True)
+        try:
+            await asyncio.Event().wait()
+        finally:
+            await application.updater.stop()
+            await application.stop()
+            await application.shutdown()
+
+    def thread_main():
+        with flask_app.app_context():
+            try:
+                asyncio.run(runner())
+            except Exception:
+                log.exception("Telegram bot stopped")
+
+    thread = threading.Thread(target=thread_main, name="gxhost-telegram", daemon=True)
+    thread.start()
+    _APP = thread
