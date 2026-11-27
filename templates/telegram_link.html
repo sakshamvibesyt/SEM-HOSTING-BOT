@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}Telegram Link · GXHOST{% endblock %}
+{% block body %}
+<div class="login-page">
+  <div class="login-card fade-in">
+    <div class="login-logo">
+      <div class="logo-icon"><i class="fas fa-paper-plane"></i></div>
+      <div class="logo-text">TELEGRAM LINK</div>
+      <div class="logo-subtitle">GXHOST Control Bot</div>
+    </div>
+    <p class="text-center">Open your GXHOST Telegram control bot and send this one-time code within 10 minutes:</p>
+    <div style="font-size:2rem;font-weight:800;letter-spacing:.18em;padding:18px;border:1px solid #25c6d9;border-radius:12px;text-align:center;margin:20px 0">{{ code }}</div>
+    <p class="text-center">Send <code>/link {{ code }}</code> to the bot.</p>
+    <p class="text-secondary text-center">This code links one Telegram chat to your panel account. Never share it.</p>
+    <a class="btn btn-secondary w-full mt-4" href="{{ url_for('dashboard') }}">Back to dashboard</a>
+  </div>
+</div>
+{% endblock %}
