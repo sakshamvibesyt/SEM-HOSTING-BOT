@@ -20,6 +20,7 @@ import atexit
 import os
 import re
 import time
+import secrets
 from datetime import timedelta
 from functools import wraps
 from typing import Any, Callable
@@ -60,6 +61,7 @@ DATA_DIR = os.path.join(BASE_DIR, os.environ.get("DATA_DIR", "data"))
 ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "")
 
 db.init(os.path.join(DATA_DIR, "panel.db"))
+db.init_telegram_tables()
 botmanager.configure(
     data_dir=DATA_DIR,
     max_upload_mb=int(os.environ.get("MAX_UPLOAD_MB", "20")),
@@ -426,6 +428,18 @@ def my_files():
     )
 
 
+# --------------------------------------------------------- Telegram pairing
+
+@app.get("/telegram/link")
+@login_required
+def telegram_link():
+    user = current_user()
+    code = secrets.token_hex(4).upper()
+    expires = int(time.time()) + 600
+    db.create_telegram_pair_code(user["id"], code, expires)
+    return render_template("telegram_link.html", code=code)
+
+
 # --------------------------------------------------------------- bot setup
 
 
@@ -765,3 +779,8 @@ def _touch_session():
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", "5000")), debug=False)
+
+
+# Optional Telegram control bot (enabled only when TELEGRAM_BOT_TOKEN is configured).
+from telegram_bot import start_telegram_bot
+start_telegram_bot(app)

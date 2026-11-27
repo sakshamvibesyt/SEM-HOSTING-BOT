@@ -285,3 +285,50 @@ def pending_bots() -> list[sqlite3.Row]:
         "SELECT b.*, u.username FROM bots b JOIN users u ON u.id = b.user_id "
         "WHERE b.status IN ('pending', 'rejected') ORDER BY b.id ASC"
     )
+
+# ---------------------------------------------------------- Telegram pairing
+
+def init_telegram_tables() -> None:
+    with _Cursor() as con:
+        con.executescript("""
+        CREATE TABLE IF NOT EXISTS telegram_pair_codes (
+            code TEXT PRIMARY KEY,
+            user_id INTEGER NOT NULL,
+            expires_at INTEGER NOT NULL,
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+        );
+        CREATE TABLE IF NOT EXISTS telegram_links (
+            chat_id INTEGER PRIMARY KEY,
+            user_id INTEGER NOT NULL UNIQUE,
+            linked_at TEXT NOT NULL,
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+        );
+        """)
+
+
+def create_telegram_pair_code(user_id: int, code: str, expires_at: int) -> None:
+    with _Cursor() as con:
+        con.execute("DELETE FROM telegram_pair_codes WHERE user_id = ? OR expires_at < ?", (user_id, int(datetime.now(timezone.utc).timestamp())))
+        con.execute("INSERT INTO telegram_pair_codes(code, user_id, expires_at) VALUES (?, ?, ?)", (code, user_id, expires_at))
+
+
+def consume_telegram_pair_code(code: str, chat_id: int) -> int | None:
+    now = int(datetime.now(timezone.utc).timestamp())
+    with _Cursor() as con:
+        row = con.execute("SELECT user_id, expires_at FROM telegram_pair_codes WHERE code = ?", (code,)).fetchone()
+        if row is None or int(row["expires_at"]) < now:
+            con.execute("DELETE FROM telegram_pair_codes WHERE code = ?", (code,))
+            return None
+        # A Telegram chat can only be linked to one panel account, and vice versa.
+        con.execute("DELETE FROM telegram_links WHERE chat_id = ? OR user_id = ?", (chat_id, row["user_id"]))
+        con.execute("INSERT INTO telegram_links(chat_id, user_id, linked_at) VALUES (?, ?, ?)", (chat_id, row["user_id"], utc_now()))
+        con.execute("DELETE FROM telegram_pair_codes WHERE code = ?", (code,))
+        return int(row["user_id"])
+
+
+def get_user_by_telegram_chat(chat_id: int) -> sqlite3.Row | None:
+    return _one("SELECT u.* FROM users u JOIN telegram_links t ON t.user_id = u.id WHERE t.chat_id = ? AND u.is_banned = 0", (chat_id,))
+
+
+def unlink_telegram_chat(chat_id: int) -> None:
+    _write("DELETE FROM telegram_links WHERE chat_id = ?", (chat_id,))

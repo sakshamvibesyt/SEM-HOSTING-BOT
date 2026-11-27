@@ -54,6 +54,7 @@ All settings are environment variables (`.env` is read at startup).
 | `MONITOR_INTERVAL` | `3` | Seconds between child-process liveness checks. |
 | `COOKIE_SECURE` | `0` | Set to `1` when served over HTTPS. |
 | `INHERIT_ENV` | `0` | `1` lets bots inherit the panel's environment instead of a clean one. |
+| `TELEGRAM_BOT_TOKEN` | empty | Optional Telegram control bot token from @BotFather. |
 
 ---
 
@@ -214,3 +215,12 @@ goes through a lock and WAL is enabled.
 - ZIP extraction, `requirements.txt` install and `.env` loading follow the
   header the original printed (`[AUTO-INSTALL enabled]`) but were never
   observed end-to-end.
+
+
+## Telegram control bot
+
+Set `TELEGRAM_BOT_TOKEN` in the hosting environment. Sign in to the web panel, open `/telegram/link`, then send `/link CODE` to the Telegram bot within 10 minutes. The linked Telegram chat can list bots, upload `.py`/`.zip` files, inspect status/files/logs, and start/stop/restart only the bots owned by that panel account. Unlink with `/unlink`.
+
+Telegram commands: `/bots`, `/upload`, `/status BOT_ID`, `/startbot BOT_ID`, `/stopbot BOT_ID`, `/restartbot BOT_ID`, `/logs BOT_ID`, `/files BOT_ID`, `/getfile BOT_ID relative/path.py`.
+
+The Telegram bot runs in the same web-service process. Use one Gunicorn worker. This does not provide sandboxing: uploaded Python code runs with the service account's privileges. Do not expose uploads to untrusted users without adding container/user isolation and resource limits. Render Free instances sleep and have ephemeral filesystems, so they are not suitable for persistent bot hosting.
