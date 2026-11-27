@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import asyncio
 import io
+import html
 import logging
 import os
 import re
@@ -11,7 +12,7 @@ import threading
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
     Application, CommandHandler, ContextTypes, MessageHandler,
-    CallbackQueryHandler, filters,
+    CallbackQueryHandler, ApplicationHandlerStop, TypeHandler, filters,
 )
 
 import botmanager
@@ -22,7 +23,10 @@ _APP = None
 _MAX_BYTES = int(os.environ.get("MAX_UPLOAD_MB", "20")) * 1024 * 1024
 PANEL_URL = os.environ.get("PANEL_URL", "https://sem-hosting-bot.onrender.com/").strip()
 WELCOME_VIDEO_URL = os.environ.get("WELCOME_VIDEO_URL", "").strip()
-FORCE_JOIN_VIDEO_URL = os.environ.get("FORCE_JOIN_VIDEO_URL", "").strip()
+FORCE_JOIN_VIDEO_URL = os.environ.get(
+    "FORCE_JOIN_VIDEO_URL",
+    "https://www.image2url.com/r2/default/videos/1793781045682-f99fe8eb-e9d8-428d-a440-ff0811aa6fcd.mp4",
+).strip()
 UPDATES_URL = os.environ.get("UPDATES_URL", "").strip()
 SUPPORT_URL = os.environ.get("SUPPORT_URL", "").strip()
 FORCE_SUB_CHANNEL = os.environ.get("FORCE_SUB_CHANNEL", "@drama_fonts").strip()
@@ -122,22 +126,31 @@ async def _require_subscription(update: Update, context: ContextTypes.DEFAULT_TY
         return True
 
     keyboard = InlineKeyboardMarkup([
-        [InlineKeyboardButton("📢 JOIN CHANNEL", url=FORCE_SUB_URL)],
-        [InlineKeyboardButton("✅ I HAVE JOINED", callback_data="force:check")],
+        [InlineKeyboardButton("🖤 JOIN THE NETWORK", url=FORCE_SUB_URL)],
+        [InlineKeyboardButton("💗 I HAVE JOINED ✓", callback_data="force:check")],
     ])
 
-    # Owner mention is intentionally inside Telegram's spoiler tag.
+    # Cute cyber-terminal style verification caption (sent with the video).
     caption = (
-        "╭━━━〔 🔐 CHANNEL VERIFICATION 〕━━━╮\n\n"
-        "Hey! Welcome to our Hosting Assistant. 💗\n\n"
-        "Hosting bot ka access lene ke liye pehle hamara official updates channel join karein.\n\n"
-        "📌 <b>Bas ye 3 steps follow karein:</b>\n"
-        "1️⃣ Neeche JOIN CHANNEL button par tap karein.\n"
-        "2️⃣ Channel join karne ke baad yahan wapas aayein.\n"
-        "3️⃣ I HAVE JOINED dabayein — verification complete hote hi access unlock ho jayega.\n\n"
-        "✨ Channel join karna zaroori hai, warna hosting assistant use nahi kar paoge.\n\n"
-        "👑 <b>Owner:</b> <tg-spoiler><a href=\"https://t.me/drama_404x\">@drama_404x</a></tg-spoiler>\n\n"
-        "╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯"
+        "╭━━━〔 🖤 𝐒𝐄𝐌 𝐂𝐘𝐁𝐄𝐑 𝐇𝐎𝐒𝐓 〕━━━╮\n\n"
+        "       ୨୧ 𝐇𝐄𝐘, 𝐂𝐘𝐁𝐄𝐑 𝐅𝐑𝐈𝐄𝐍𝐃! ♡\n\n"
+        "⌁ 𝐒𝐘𝐒𝐓𝐄𝐌 𝐈𝐍𝐈𝐓𝐈𝐀𝐋𝐈𝐙𝐄𝐃...\n"
+        "⌁ 𝐒𝐄𝐂𝐔𝐑𝐄 𝐂𝐎𝐍𝐍𝐄𝐂𝐓𝐈𝐎𝐍 ✓\n"
+        "⌁ 𝐇𝐎𝐒𝐓𝐈𝐍𝐆 𝐏𝐀𝐍𝐄𝐋 𝐎𝐍 𝐒𝐓𝐀𝐍𝐃𝐁𝐘...\n\n"
+        "╰━━━━━━━━━━━━━━━━━━━━━━━━━━╯\n\n"
+        "୨୧ 𝐘𝐎𝐔𝐑 𝐂𝐘𝐁𝐄𝐑 𝐖𝐎𝐑𝐋𝐃 ♡\n\n"
+        "🤖 Deploy your Telegram bots\n"
+        "📂 Manage files & configurations\n"
+        "⚡ Start • Stop • Restart processes\n"
+        "📡 Monitor status & live logs\n\n"
+        "╭━━━〔 🔒 𝐀𝐂𝐂𝐄𝐒𝐒 𝐋𝐎𝐂𝐊𝐄𝐃 〕━━━╮\n\n"
+        "♡ Just one tiny step before entering!\n"
+        "Join our official channel, then return\n"
+        "here and tap I HAVE JOINED to unlock\n"
+        "your personal hosting terminal.\n\n"
+        "╰━━━━━━━━━━━━━━━━━━━━━━━━━━╯\n\n"
+        "       ⌁ 𝐒𝐓𝐀𝐘 𝐂𝐔𝐓𝐄. 𝐒𝐓𝐀𝐘 𝐂𝐘𝐁𝐄𝐑. ♡\n"
+        "       👑 <tg-spoiler><a href=\"https://t.me/" + OWNER_USERNAME + "\">@" + OWNER_USERNAME + "</a></tg-spoiler>"
     )
 
     message = update.effective_message
@@ -167,31 +180,39 @@ async def _require_subscription(update: Update, context: ContextTypes.DEFAULT_TY
 
 async def _send_welcome(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
-    first = user.first_name if user and user.first_name else "there"
+    first = html.escape(user.first_name if user and user.first_name else "Cyber Friend")
     caption = (
-        f"💗 Hey {first}!\n\n"
-        "Welcome to *GXHOST Hosting* ✨\n"
-        "Your personal bot hosting assistant is ready!\n\n"
-        "🚀 Upload and manage your Python bots\n"
-        "📂 Access your bot files\n"
-        "⚡ Start, stop and restart your bots\n"
-        "📊 Check status and live logs\n\n"
-        "Choose an option below to get started."
+        f"╭━━━〔 🖤 𝐒𝐄𝐌 𝐂𝐘𝐁𝐄𝐑 𝐇𝐎𝐒𝐓 〕━━━╮\n\n"
+        f"       ୨୧ 𝐖𝐄𝐋𝐂𝐎𝐌𝐄, {first}! ♡\n\n"
+        "⌁ 𝐒𝐘𝐒𝐓𝐄𝐌 𝐒𝐓𝐀𝐓𝐔𝐒: <b>ONLINE</b> ✓\n"
+        "⌁ 𝐒𝐄𝐂𝐔𝐑𝐄 𝐒𝐄𝐒𝐒𝐈𝐎𝐍: <b>ACTIVE</b> ✓\n"
+        "⌁ 𝐇𝐎𝐒𝐓𝐈𝐍𝐆 𝐓𝐄𝐑𝐌𝐈𝐍𝐀𝐋: <b>READY</b> ✓\n\n"
+        "╰━━━━━━━━━━━━━━━━━━━━━━━━━━╯\n\n"
+        "୨୧ 𝐘𝐎𝐔𝐑 𝐂𝐘𝐁𝐄𝐑 𝐓𝐎𝐎𝐋𝐊𝐈𝐓 ♡\n\n"
+        "🤖 Deploy and manage Telegram bots\n"
+        "📂 Upload files and manage configurations\n"
+        "⚡ Start • Stop • Restart processes\n"
+        "📡 Check bot status and live logs\n\n"
+        "╭━━━〔 ✦ 𝐂𝐇𝐎𝐎𝐒𝐄 𝐘𝐎𝐔𝐑 𝐍𝐄𝐗𝐓 𝐒𝐓𝐄𝐏 〕━━━╮\n"
+        "Use the buttons below to enter your control panel.\n"
+        "╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯\n\n"
+        f"👑 <tg-spoiler><a href=\"https://t.me/{OWNER_USERNAME}\">@{OWNER_USERNAME}</a></tg-spoiler>\n"
+        "       ⌁ 𝐒𝐓𝐀𝐘 𝐂𝐔𝐓𝐄. 𝐒𝐓𝐀𝐘 𝐂𝐘𝐁𝐄𝐑. ♡"
     )
     markup = _user_keyboard() if _linked(update) else _auth_keyboard()
     if WELCOME_VIDEO_URL:
         try:
             await update.effective_message.reply_video(
                 video=WELCOME_VIDEO_URL, caption=caption,
-                parse_mode="Markdown", reply_markup=markup,
+                parse_mode="HTML", reply_markup=markup,
             )
             return
         except Exception:
             log.exception("Welcome video could not be sent; falling back to text")
     await update.effective_message.reply_text(
-        caption, parse_mode="Markdown", reply_markup=markup
+        caption, parse_mode="HTML", reply_markup=markup,
+        disable_web_page_preview=True,
     )
-
 
 async def start_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data.pop("auth_state", None)
@@ -553,6 +574,21 @@ async def getfile_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.effective_message.reply_document(document=fh, filename=os.path.basename(target))
 
 
+
+async def force_join_gate(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Block every bot interaction until the user joins the required channel."""
+    # The verification button itself must be allowed through so it can check membership.
+    query = update.callback_query
+    if query and query.data == "force:check":
+        return
+    if not update.effective_user:
+        return
+    if await _is_subscribed(update, context):
+        return
+    await _require_subscription(update, context)
+    raise ApplicationHandlerStop
+
+
 def start_telegram_bot(flask_app) -> None:
     """Start polling in a daemon thread when TELEGRAM_BOT_TOKEN is configured."""
     token = os.environ.get("TELEGRAM_BOT_TOKEN", "").strip()
@@ -566,6 +602,7 @@ def start_telegram_bot(flask_app) -> None:
 
     async def runner():
         application = Application.builder().token(token).build()
+        application.add_handler(TypeHandler(Update, force_join_gate), group=-1)
         application.add_handler(CommandHandler("start", start_cmd))
         application.add_handler(CommandHandler("pannel", pannel_cmd))
         application.add_handler(CommandHandler("panel", pannel_cmd))
