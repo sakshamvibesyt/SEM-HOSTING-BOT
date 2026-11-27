@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% from "_macros.html" import flash_messages, sidebar with context %}
+{% block title %}Setup {{ bot['name'] }} - GX Host{% endblock %}
+{% block page_css %}
+{% include "_css/dashboard.css" %}
+{% endblock %}
+
+{% block body %}
+<div class="app-container">
+    {{ sidebar('dashboard') }}
+
+    <main class="main-content" style="flex: 1; height: 100vh; overflow-y: auto;">
+        <div class="top-bar">
+            <div class="top-bar-left">
+                <button class="menu-toggle" onclick="toggleSidebar()"><i class="fas fa-bars"></i></button>
+                <h1 class="page-title">Bot <span>Setup</span></h1>
+            </div>
+            <div class="top-actions">
+                <a href="{{ url_for('dashboard') }}" class="btn btn-secondary"><i class="fas fa-arrow-left"></i> <span>Dashboard</span></a>
+            </div>
+        </div>
+
+        <div class="content-area">
+            {{ flash_messages() }}
+
+            <div class="card fade-in" style="max-width: 640px; margin: 0 auto;">
+                <div class="card-header">
+                    <div>
+                        <div class="card-title">Choose the entry point</div>
+                        <div style="font-size: 12px; color: var(--text-secondary); font-family: 'JetBrains Mono', monospace; margin-top: 4px;">
+                            {{ bot['name'] }} · {{ bot['uid'] }}
+                        </div>
+                    </div>
+                </div>
+                <div class="card-body">
+                    {% if files %}
+                    <form method="POST" action="{{ url_for('setup', bot_id=bot['id']) }}">
+                        <div class="form-group">
+                            <label class="form-label"><i class="fas fa-play"></i> Entry Point</label>
+                            <select name="file" class="form-input" required>
+                                {% for file in files %}
+                                <option value="{{ file }}" {{ 'selected' if file == bot['entry_point'] }}>{{ file }}</option>
+                                {% endfor %}
+                            </select>
+                            <p style="font-size: 12px; color: var(--text-secondary); margin-top: 10px;">
+                                The panel runs this file with <code>python -u</code>. Other files stay importable
+                                relative to its folder, and a <code>.env</code> beside it is loaded automatically.
+                            </p>
+                        </div>
+                        <button type="submit" class="btn btn-primary w-full">
+                            <i class="fas fa-check"></i> Save &amp; Submit
+                        </button>
+                    </form>
+                    {% else %}
+                    <div class="empty-state">
+                        <div class="empty-icon"><i class="fas fa-file-code"></i></div>
+                        <div class="empty-title">No Python Files</div>
+                        <div class="empty-text">This upload has no .py file to run. Delete it and upload again.</div>
+                        <a href="{{ url_for('dashboard') }}" class="btn btn-secondary"><i class="fas fa-arrow-left"></i> Back to Dashboard</a>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </main>
+</div>
+{% endblock %}

@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}{{ code }} - GX Host{% endblock %}
+{% block body %}
+<div class="login-page" style="align-items:center;justify-content:center;display:flex;min-height:100vh;padding:24px;">
+    <div class="card fade-in" style="max-width: 520px; width: 100%; margin: 0 auto; text-align: center;">
+        <div class="card-body" style="padding: 48px 28px;">
+            <div style="font-size: 44px; color: var(--accent-primary); margin-bottom: 12px;"><i class="fas fa-triangle-exclamation"></i></div>
+            <div style="font-size: 34px; font-weight: 800; margin-bottom: 6px;">{{ code }}</div>
+            <div style="color: var(--text-secondary); margin-bottom: 22px;">{{ message }}</div>
+            <a href="{{ url_for('dashboard') }}" class="btn btn-primary"><i class="fas fa-home"></i> Back to Dashboard</a>
+            <a href="{{ url_for('login') }}" class="btn btn-secondary" style="margin-left:8px;"><i class="fas fa-sign-in-alt"></i> Sign In</a>
+        </div>
+    </div>
+</div>
+{% endblock %}

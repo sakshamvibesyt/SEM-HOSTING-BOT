@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+{% from "_macros.html" import flash_messages, sidebar, badge with context %}
+{% block title %}My Files - GX Host{% endblock %}
+{% block page_css %}
+{% include "_css/myfiles.css" %}
+{% endblock %}
+
+{% block body %}
+<div class="app-container">
+    {{ sidebar('my_files') }}
+
+    <main class="main-content" style="flex: 1; height: 100vh; overflow-y: auto;">
+        <div class="top-bar">
+            <div class="top-bar-left">
+                <button class="menu-toggle" onclick="toggleSidebar()"><i class="fas fa-bars"></i></button>
+                <h1 class="page-title">My <span>Files</span></h1>
+            </div>
+            <div class="top-actions">
+                <div class="stat-tag"><i class="fas fa-hdd"></i> <span>{{ total_bytes|human_size }}</span></div>
+                <div class="stat-tag"><i class="fas fa-file"></i> <span>{{ total_files }} Files</span></div>
+            </div>
+        </div>
+
+        <div class="content-area">
+            {{ flash_messages() }}
+
+            {% if folders %}
+                {% for folder in folders %}
+                {% set bot = folder.bot %}
+                <div class="card fade-in">
+                    <div class="card-header">
+                        <div style="display: flex; align-items: center; gap: 12px;">
+                            <div class="folder-icon"><i class="fas fa-folder"></i></div>
+                            <div>
+                                <div class="card-title">{{ bot['name'] }}</div>
+                                <div style="font-size: 11px; color: var(--text-secondary); font-family: 'JetBrains Mono', monospace;">
+                                    UID: <span style="color:var(--accent-cyan);">{{ bot['uid'] }}</span> |
+                                    {{ folder.files|length }} files | {{ folder.size|human_size }}
+                                </div>
+                            </div>
+                        </div>
+                        {{ badge(bot['status']) }}
+                    </div>
+
+                    <div class="card-body" style="padding: 0;">
+                        <div class="file-tree">
+                            {% for file in folder.files %}
+                            <div class="file-item">
+                                <div class="file-left-group">
+                                    <div class="file-mini-icon {{ 'py' if file.is_py else 'zip' }}">
+                                        {% if file.is_py %}<i class="fab fa-python"></i>{% else %}<i class="fas fa-file-archive"></i>{% endif %}
+                                    </div>
+                                    <div style="overflow: hidden;">
+                                        <div class="file-name-text">
+                                            <span>{{ file.name }}</span>
+                                            {% if file.is_entry %}<span class="entry-badge"><i class="fas fa-play" style="font-size:8px;"></i> Entry Point</span>{% endif %}
+                                        </div>
+                                        <div class="file-meta-sub">{{ file.name.split('/')[-1] }} | Mod: {{ file.modified }}</div>
+                                    </div>
+                                </div>
+                                <div class="file-right-group">
+                                    <div class="file-size-str">{{ file.size|human_size }}</div>
+                                    <a href="{{ url_for('download_file', bot_id=bot['id'], relpath=file.name) }}" class="btn btn-secondary btn-sm btn-icon" title="Download file"><i class="fas fa-download"></i></a>
+                                    {% if not file.is_entry %}
+                                    <form method="POST" action="{{ url_for('delete_file', bot_id=bot['id'], relpath=file.name) }}" onsubmit="return confirm('Delete {{ file.name }}?');" style="display:inline;">
+                                        <button class="btn btn-danger btn-sm btn-icon" title="Delete file"><i class="fas fa-trash"></i></button>
+                                    </form>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            {% else %}
+                            <div style="padding: 28px; text-align: center; color: var(--text-secondary); font-size: 13px;">This bot folder is empty.</div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            {% else %}
+            <div class="card" style="background: var(--bg-card); border: 1px dashed var(--border-color); text-align: center;">
+                <div class="empty-state">
+                    <div class="empty-icon"><i class="fas fa-folder-open"></i></div>
+                    <div class="empty-title">No Files Yet</div>
+                    <div class="empty-text">Upload a bot to view and manage its internal file structure here.</div>
+                    <a href="{{ url_for('upload') }}" class="btn btn-primary"><i class="fas fa-cloud-upload-alt"></i> Upload Bot</a>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </main>
+</div>
+{% endblock %}

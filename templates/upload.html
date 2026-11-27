@@ -1,0 +1,111 @@
+{% extends "base.html" %}
+{% from "_macros.html" import flash_messages, sidebar with context %}
+{% block title %}Upload Bot - GX Host{% endblock %}
+{% block page_css %}
+{% include "_css/upload.css" %}
+{% endblock %}
+
+{% block body %}
+<div class="app-container">
+    {{ sidebar('upload') }}
+
+    <main class="main-content" style="flex: 1; height: 100vh; overflow-y: auto;">
+        <div class="top-bar">
+            <div class="top-bar-left">
+                <button class="menu-toggle" onclick="toggleSidebar()"><i class="fas fa-bars"></i></button>
+                <h1 class="page-title">Upload <span>Bot</span></h1>
+            </div>
+            <div class="top-actions">
+                <a href="{{ url_for('dashboard') }}" class="btn btn-secondary">
+                    <i class="fas fa-arrow-left"></i> <span>Dashboard</span>
+                </a>
+            </div>
+        </div>
+
+        <div class="content-area">
+            {{ flash_messages() }}
+
+            <div class="card fade-in" style="max-width: 720px; margin: 0 auto;">
+                <div class="card-header">
+                    <div class="card-title"><i class="fas fa-cloud-upload-alt"></i> Deploy a New Bot</div>
+                </div>
+                <div class="card-body">
+                    <form method="POST" action="{{ url_for('upload') }}" enctype="multipart/form-data" id="uploadForm">
+                        <div class="upload-zone" id="uploadZone" onclick="document.getElementById('fileInput').click()">
+                            <input type="file" id="fileInput" name="file" accept=".py,.zip" style="display: none;" required>
+                            <div class="upload-icon"><i class="fas fa-cloud-upload-alt"></i></div>
+                            <div class="upload-title">Drop your bot here</div>
+                            <div class="upload-subtitle">or click to browse — <strong>.py</strong> or <strong>.zip</strong></div>
+                            <div class="upload-hint">
+                                <i class="fas fa-info-circle"></i>
+                                Zip archives may include <code>requirements.txt</code> and a <code>.env</code> file.
+                            </div>
+                        </div>
+
+                        <div class="file-details" id="fileDetails" style="display: none;">
+                            <div class="file-icon"><i class="fab fa-python"></i></div>
+                            <div style="flex: 1; overflow: hidden;">
+                                <div class="file-name" id="fileName">—</div>
+                                <div class="file-size" id="fileSize">—</div>
+                            </div>
+                            <button type="button" class="btn btn-danger btn-sm btn-icon" onclick="clearFile()" title="Remove">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </div>
+
+                        <button type="submit" class="btn btn-primary w-full" style="margin-top: 20px;" id="submitBtn" disabled>
+                            <i class="fas fa-rocket"></i> Upload &amp; Deploy
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </main>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const zone = document.getElementById('uploadZone');
+const input = document.getElementById('fileInput');
+const details = document.getElementById('fileDetails');
+const submitBtn = document.getElementById('submitBtn');
+
+function humanSize(bytes) {
+    const units = ['B', 'KB', 'MB', 'GB'];
+    let value = bytes, i = 0;
+    while (value >= 1024 && i < units.length - 1) { value /= 1024; i++; }
+    return (i === 0 ? value : value.toFixed(1)) + ' ' + units[i];
+}
+
+function showFile(file) {
+    if (!file) return;
+    const ok = /\.(py|zip)$/i.test(file.name);
+    document.getElementById('fileName').textContent = file.name;
+    document.getElementById('fileSize').textContent = ok ? humanSize(file.size) : 'Only .py or .zip files are allowed';
+    details.style.display = 'flex';
+    submitBtn.disabled = !ok;
+}
+
+function clearFile() {
+    input.value = '';
+    details.style.display = 'none';
+    submitBtn.disabled = true;
+}
+
+input.addEventListener('change', function () { showFile(input.files[0]); });
+
+['dragenter', 'dragover'].forEach(function (evt) {
+    zone.addEventListener(evt, function (e) { e.preventDefault(); zone.classList.add('dragover'); });
+});
+['dragleave', 'drop'].forEach(function (evt) {
+    zone.addEventListener(evt, function (e) { e.preventDefault(); zone.classList.remove('dragover'); });
+});
+zone.addEventListener('drop', function (e) {
+    if (e.dataTransfer.files.length) {
+        input.files = e.dataTransfer.files;
+        showFile(e.dataTransfer.files[0]);
+    }
+});
+</script>
+{% endblock %}

@@ -1,1 +1,75 @@
+{% macro flash_messages() %}
+{% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+    <div class="flash-container">
+        {% for category, message in messages %}
+        <div class="flash-message flash-{{ category if category in ('success', 'error', 'warning') else 'success' }}">
+            <i class="fas fa-{{ 'check-circle' if category == 'success' else ('exclamation-circle' if category == 'warning' else 'times-circle') }}"></i>
+            <span>{{ message }}</span>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+{% endwith %}
+{% endmacro %}
 
+{% macro badge(status) %}
+<span class="badge badge-{{ {'running': 'running', 'stopped': 'stopped', 'pending': 'pending', 'setup': 'setup', 'rejected': 'rejected'}.get(status, 'stopped') }}">
+    <span class="badge-dot"></span> {{ status|upper }}
+</span>
+{% endmacro %}
+
+{% macro sidebar(active) %}
+<div class="sidebar-overlay" id="sidebarOverlay" onclick="toggleSidebar()"></div>
+<aside class="sidebar" id="appSidebar">
+    <div class="sidebar-header">
+        <a href="{{ url_for('dashboard') }}" class="logo">
+            <div class="logo-icon"><i class="fas fa-rocket"></i></div>
+            <div>
+                <div class="logo-text">{{ panel_name }}</div>
+                <div class="logo-subtitle">{{ panel_tagline }}</div>
+            </div>
+        </a>
+        <button class="close-sidebar-btn" onclick="toggleSidebar()"><i class="fas fa-times"></i></button>
+    </div>
+
+    <nav class="nav-menu">
+        <div class="nav-section-title">Main</div>
+        <a href="{{ url_for('dashboard') }}" class="nav-item {{ 'active' if active == 'dashboard' }}">
+            <i class="fas fa-home"></i> <span>Dashboard</span>
+        </a>
+        <a href="{{ url_for('upload') }}" class="nav-item {{ 'active' if active == 'upload' }}">
+            <i class="fas fa-cloud-upload-alt"></i> <span>Upload Bot</span>
+        </a>
+        <a href="{{ url_for('my_files') }}" class="nav-item {{ 'active' if active == 'my_files' }}">
+            <i class="fas fa-folder-open"></i> <span>My Files</span>
+        </a>
+        {% if is_admin %}
+        <div class="nav-section-title">Admin</div>
+        <a href="{{ url_for('admin_panel') }}" class="nav-item {{ 'active' if active == 'admin' }}">
+            <i class="fas fa-shield-alt"></i> <span>Admin Panel</span>
+        </a>
+        {% endif %}
+    </nav>
+
+    <div class="sidebar-footer">
+        <div class="user-card">
+            <div class="user-avatar">{{ avatar_letter }}</div>
+            <div class="user-info">
+                <div class="user-name">{{ current_user['username'] }}</div>
+                <div class="user-role">{{ 'Admin' if current_user['role'] == 'admin' else 'User' }}</div>
+            </div>
+            <a href="{{ url_for('logout') }}" class="logout-btn" title="Logout"><i class="fas fa-sign-out-alt"></i></a>
+        </div>
+    </div>
+</aside>
+{% endmacro %}
+
+{% macro topbar(title, highlight) %}
+<div class="top-bar">
+    <div class="top-bar-left">
+        <button class="menu-toggle" onclick="toggleSidebar()"><i class="fas fa-bars"></i></button>
+        <h1 class="page-title">{{ title }} <span>{{ highlight }}</span></h1>
+    </div>
+</div>
+{% endmacro %}

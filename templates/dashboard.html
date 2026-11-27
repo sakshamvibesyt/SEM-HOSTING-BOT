@@ -1,0 +1,282 @@
+{% extends "base.html" %}
+{% from "_macros.html" import flash_messages, badge, sidebar with context %}
+{% block title %}Dashboard - GX Host{% endblock %}
+{% block page_css %}
+{% include "_css/dashboard.css" %}
+{% endblock %}
+
+{% block body %}
+<div class="app-container">
+    {{ sidebar('dashboard') }}
+
+    <main class="main-content" style="flex: 1; height: 100vh; overflow-y: auto;">
+        <div class="top-bar">
+            <div class="top-bar-left">
+                <button class="menu-toggle" onclick="toggleSidebar()"><i class="fas fa-bars"></i></button>
+                <h1 class="page-title">Dashboard <span>Overview</span></h1>
+            </div>
+            <div class="top-actions">
+                <a href="{{ url_for('admin_gate') }}" class="btn btn-secondary">
+                    <i class="fas fa-shield-alt"></i> <span>Admin Access</span>
+                </a>
+                <a href="{{ url_for('upload') }}" class="btn btn-primary">
+                    <i class="fas fa-plus"></i> <span>New Bot</span>
+                </a>
+            </div>
+        </div>
+
+        <div class="content-area">
+            {{ flash_messages() }}
+
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-icon purple"><i class="fas fa-robot"></i></div>
+                    <div class="stat-value">{{ counts.total }}</div>
+                    <div class="stat-label">Total Bots</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon green"><i class="fas fa-play-circle"></i></div>
+                    <div class="stat-value">{{ counts.running }}</div>
+                    <div class="stat-label">Running</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon orange"><i class="fas fa-clock"></i></div>
+                    <div class="stat-value">{{ counts.pending }}</div>
+                    <div class="stat-label">Pending</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon red"><i class="fas fa-stop-circle"></i></div>
+                    <div class="stat-value">{{ counts.stopped }}</div>
+                    <div class="stat-label">Stopped</div>
+                </div>
+            </div>
+
+            {% if cards %}
+            <div class="bots-grid">
+                {% for card in cards %}
+                {% set bot = card.bot %}
+                <div class="bot-card" id="bot-card-{{ bot['id'] }}">
+                    <div class="bot-card-header">
+                        <div class="bot-info">
+                            <h3>{{ bot['name'] }}</h3>
+                            <div class="bot-uid">{{ bot['uid'] }}</div>
+                        </div>
+                        <span class="badge badge-{{ {'running': 'running', 'stopped': 'stopped', 'pending': 'pending', 'setup': 'setup', 'rejected': 'rejected'}.get(bot['status'], 'stopped') }}" id="status-{{ bot['id'] }}">
+                            <span class="badge-dot"></span> {{ bot['status']|upper }}
+                        </span>
+                    </div>
+
+                    <div class="bot-meta">
+                        <div class="bot-meta-item">
+                            <span class="bot-meta-label">Entry Point</span>
+                            <span class="bot-meta-value">{{ bot['entry_point'] or '— not set —' }}</span>
+                        </div>
+                        <div class="bot-meta-item">
+                            <span class="bot-meta-label">Security</span>
+                            <span class="bot-meta-value" id="security-{{ bot['id'] }}">
+                                {% if card.security == 'safe' %}
+                                <span class="badge badge-running" style="font-size:10px;padding:2px 8px;"><i class="fas fa-shield-alt"></i> Safe</span>
+                                {% else %}
+                                <span class="badge badge-pending" style="font-size:10px;padding:2px 8px;" title="{{ card.findings|join(', ') }}"><i class="fas fa-exclamation-triangle"></i> Review</span>
+                                {% endif %}
+                            </span>
+                        </div>
+                        <div class="bot-meta-item">
+                            <span class="bot-meta-label">Uptime</span>
+                            <span class="bot-meta-value" id="uptime-{{ bot['id'] }}">{{ bot|uptime }}</span>
+                        </div>
+                        <div class="bot-meta-item">
+                            <span class="bot-meta-label">Restarts</span>
+                            <span class="bot-meta-value" id="restarts-{{ bot['id'] }}">{{ bot['restarts'] }}</span>
+                        </div>
+                    </div>
+
+                    <div class="live-console-wrapper" id="console-wrapper-{{ bot['id'] }}">
+                        <div class="live-console-header" onclick="toggleConsole({{ bot['id'] }})">
+                            <div style="display:flex;align-items:center;gap:8px;">
+                                <i class="fas fa-terminal"></i>
+                                <span>Live Console</span>
+                            </div>
+                            <div style="display:flex;align-items:center;gap:6px;">
+                                <button class="btn btn-sm btn-icon btn-secondary" onclick="event.stopPropagation();refreshConsole({{ bot['id'] }})" title="Refresh"><i class="fas fa-redo"></i></button>
+                                <button class="btn btn-sm btn-icon btn-secondary" onclick="event.stopPropagation();toggleConsole({{ bot['id'] }})" title="Toggle"><i class="fas fa-chevron-down" id="console-chevron-{{ bot['id'] }}"></i></button>
+                            </div>
+                        </div>
+                        <div class="live-console-body" id="console-body-{{ bot['id'] }}" style="display:none;">
+                            <div class="live-console" id="console-{{ bot['id'] }}">
+                                <div style="text-align:center;padding:20px;color:var(--text-secondary);"><i class="fas fa-spinner fa-spin" style="margin-bottom:8px;display:block;"></i>Loading logs...</div>
+                            </div>
+                            <div class="live-console-footer">
+                                <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px;color:var(--text-secondary);">
+                                    <input type="checkbox" id="console-auto-{{ bot['id'] }}" onchange="toggleConsoleAuto({{ bot['id'] }})" style="accent-color:var(--accent-cyan);">
+                                    <span>Auto-refresh (3s)</span>
+                                </label>
+                                <a href="{{ url_for('logs', bot_id=bot['id']) }}" class="btn btn-sm btn-secondary" style="font-size:11px;"><i class="fas fa-external-link-alt"></i> Logs</a>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bot-actions">
+                        {% if bot['status'] == 'running' %}
+                        <button class="btn btn-danger btn-sm" id="btn-stop-{{ bot['id'] }}" onclick="controlBot({{ bot['id'] }}, 'stop')"><i class="fas fa-stop"></i> Stop</button>
+                        {% elif bot['status'] == 'pending' %}
+                        <button class="btn btn-secondary btn-sm" disabled title="An admin must approve this bot before it can run"><i class="fas fa-hourglass-half"></i> Awaiting Approval</button>
+                        {% elif bot['status'] == 'rejected' %}
+                        <button class="btn btn-secondary btn-sm" disabled title="This bot was rejected. Update it and resubmit."><i class="fas fa-ban"></i> Rejected</button>
+                        {% else %}
+                        <button class="btn btn-success btn-sm" id="btn-start-{{ bot['id'] }}" onclick="controlBot({{ bot['id'] }}, 'start')"><i class="fas fa-play"></i> Start</button>
+                        {% endif %}
+                        <button class="btn btn-secondary btn-sm" onclick="controlBot({{ bot['id'] }}, 'restart')"><i class="fas fa-redo"></i> Restart</button>
+                        <button class="btn btn-secondary btn-sm" onclick="toggleConsole({{ bot['id'] }})"><i class="fas fa-terminal"></i> Console</button>
+                        {% if bot['status'] in ('setup', 'rejected') %}
+                        <a class="btn btn-secondary btn-sm" href="{{ url_for('setup', bot_id=bot['id']) }}"><i class="fas fa-cog"></i> Setup</a>
+                        {% endif %}
+                        <button class="btn btn-danger btn-sm btn-icon" onclick="deleteBot({{ bot['id'] }})" title="Delete"><i class="fas fa-trash"></i></button>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="card" style="background: var(--bg-card); border: 1px dashed var(--border-color); border-radius: var(--radius-md); padding: 40px; text-align: center;">
+                <div class="empty-state">
+                    <div class="empty-icon" style="font-size: 40px; color: var(--accent-cyan); margin-bottom: 10px;"><i class="fas fa-robot"></i></div>
+                    <div class="empty-title" style="font-size: 18px; font-weight: 700; margin-bottom: 6px;">No Bots Yet</div>
+                    <div class="empty-text" style="font-size: 13px; color: var(--text-secondary); margin-bottom: 18px;">Upload your first bot to get started immediately.</div>
+                    <a href="{{ url_for('upload') }}" class="btn btn-primary"><i class="fas fa-cloud-upload-alt"></i> Upload Bot</a>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </main>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const consoleIntervals = {};
+
+function toggleConsole(botId) {
+    const body = document.getElementById('console-body-' + botId);
+    const chevron = document.getElementById('console-chevron-' + botId);
+    const isOpen = body.style.display === 'block';
+    if (isOpen) {
+        body.style.display = 'none';
+        chevron.classList.remove('fa-chevron-up');
+        chevron.classList.add('fa-chevron-down');
+        if (consoleIntervals[botId]) { clearInterval(consoleIntervals[botId]); delete consoleIntervals[botId]; }
+        document.getElementById('console-auto-' + botId).checked = false;
+    } else {
+        body.style.display = 'block';
+        chevron.classList.remove('fa-chevron-down');
+        chevron.classList.add('fa-chevron-up');
+        refreshConsole(botId);
+    }
+}
+
+async function refreshConsole(botId) {
+    const consoleEl = document.getElementById('console-' + botId);
+    try {
+        const response = await fetch('/logs_raw/' + botId);
+        const text = await response.text();
+        if (text.trim()) {
+            consoleEl.textContent = text;
+        } else {
+            consoleEl.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text-secondary);"><i class="fas fa-file-alt" style="margin-bottom:8px;display:block;"></i>No logs yet.</div>';
+        }
+        consoleEl.scrollTop = consoleEl.scrollHeight;
+    } catch (e) {
+        consoleEl.textContent = 'Failed to load logs';
+    }
+}
+
+function toggleConsoleAuto(botId) {
+    const checkbox = document.getElementById('console-auto-' + botId);
+    if (checkbox.checked) {
+        refreshConsole(botId);
+        consoleIntervals[botId] = setInterval(() => refreshConsole(botId), 3000);
+    } else if (consoleIntervals[botId]) {
+        clearInterval(consoleIntervals[botId]);
+        delete consoleIntervals[botId];
+    }
+}
+
+async function controlBot(botId, action) {
+    const btn = event.target.closest('button');
+    const originalHTML = btn.innerHTML;
+    btn.innerHTML = '<div class="spinner"></div>';
+    btn.disabled = true;
+    try {
+        const response = await fetch('/' + action + '/' + botId, { method: 'POST' });
+        const data = await response.json();
+        if (data.ok) {
+            showToast('success', data.msg || (action + 'ed successfully!'));
+            setTimeout(() => location.reload(), 900);
+        } else {
+            showToast('error', data.msg || 'Action failed');
+            btn.innerHTML = originalHTML;
+            btn.disabled = false;
+        }
+    } catch (err) {
+        showToast('error', 'Network error');
+        btn.innerHTML = originalHTML;
+        btn.disabled = false;
+    }
+}
+
+async function deleteBot(botId) {
+    if (!confirm('Delete this bot and all of its files?')) return;
+    try {
+        const response = await fetch('/delete/' + botId, { method: 'POST' });
+        const data = await response.json();
+        if (data.ok) {
+            showToast('success', 'Bot deleted!');
+            const card = document.getElementById('bot-card-' + botId);
+            card.style.opacity = '0';
+            setTimeout(() => location.reload(), 500);
+        } else {
+            showToast('error', data.msg || 'Delete failed');
+        }
+    } catch (err) {
+        showToast('error', 'Network error');
+    }
+}
+
+function showToast(type, message) {
+    let container = document.querySelector('.flash-container');
+    if (!container) {
+        container = document.createElement('div');
+        container.className = 'flash-container';
+        document.body.appendChild(container);
+    }
+    const toast = document.createElement('div');
+    toast.className = 'flash-message flash-' + type;
+    toast.innerHTML = '<i class="fas fa-' + (type === 'success' ? 'check-circle' : 'times-circle') + '"></i><span></span>';
+    toast.querySelector('span').textContent = message;
+    container.appendChild(toast);
+    setTimeout(function () {
+        toast.style.opacity = '0';
+        toast.style.transform = 'translateX(100%)';
+        setTimeout(() => toast.remove(), 300);
+    }, 4000);
+}
+
+// Poll running bots so the uptime/badge stay honest without a reload.
+setInterval(async function () {
+    document.querySelectorAll('[id^="status-"]').forEach(async function (el) {
+        const botId = el.id.replace('status-', '');
+        try {
+            const res = await fetch('/status/' + botId);
+            if (!res.ok) return;
+            const data = await res.json();
+            const uptimeEl = document.getElementById('uptime-' + botId);
+            if (uptimeEl) uptimeEl.textContent = data.uptime;
+            const restartsEl = document.getElementById('restarts-' + botId);
+            if (restartsEl) restartsEl.textContent = data.restarts;
+            if (!el.className.includes(data.status)) {
+                location.reload();
+            }
+        } catch (e) { /* keep polling */ }
+    });
+}, 10000);
+</script>
+{% endblock %}

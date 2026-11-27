@@ -1,0 +1,150 @@
+{% extends "base.html" %}
+{% from "_macros.html" import flash_messages, sidebar, badge with context %}
+{% block title %}Admin Panel - GX Host{% endblock %}
+{% block page_css %}
+{% include "_css/dashboard.css" %}
+{% endblock %}
+
+{% block body %}
+<div class="app-container">
+    {{ sidebar('admin') }}
+
+    <main class="main-content" style="flex: 1; height: 100vh; overflow-y: auto;">
+        <div class="top-bar">
+            <div class="top-bar-left">
+                <button class="menu-toggle" onclick="toggleSidebar()"><i class="fas fa-bars"></i></button>
+                <h1 class="page-title">Admin <span>Panel</span></h1>
+            </div>
+            <div class="top-actions">
+                <a href="{{ url_for('admin_lock') }}" class="btn btn-secondary"><i class="fas fa-lock"></i> <span>Lock</span></a>
+                <a href="{{ url_for('dashboard') }}" class="btn btn-primary"><i class="fas fa-home"></i> <span>Dashboard</span></a>
+            </div>
+        </div>
+
+        <div class="content-area">
+            {{ flash_messages() }}
+
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-icon purple"><i class="fas fa-users"></i></div>
+                    <div class="stat-value">{{ counts.users }}</div>
+                    <div class="stat-label">Users</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon purple"><i class="fas fa-robot"></i></div>
+                    <div class="stat-value">{{ counts.bots }}</div>
+                    <div class="stat-label">Bots</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon green"><i class="fas fa-play-circle"></i></div>
+                    <div class="stat-value">{{ counts.running }}</div>
+                    <div class="stat-label">Running</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon orange"><i class="fas fa-clock"></i></div>
+                    <div class="stat-value">{{ counts.pending }}</div>
+                    <div class="stat-label">Needs Review</div>
+                </div>
+            </div>
+
+            <div class="card fade-in">
+                <div class="card-header"><div class="card-title">Create User</div></div>
+                <div class="card-body">
+                    <form method="POST" action="{{ url_for('admin_create_user') }}" style="display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end;">
+                        <div class="form-group" style="flex: 1; min-width: 180px; margin: 0;">
+                            <label class="form-label">Username</label>
+                            <input type="text" name="username" class="form-input" required minlength="3" maxlength="32" autocomplete="off">
+                        </div>
+                        <div class="form-group" style="flex: 1; min-width: 180px; margin: 0;">
+                            <label class="form-label">Password</label>
+                            <input type="password" name="password" class="form-input" required minlength="6" autocomplete="new-password">
+                        </div>
+                        <div class="form-group" style="min-width: 130px; margin: 0;">
+                            <label class="form-label">Role</label>
+                            <select name="role" class="form-input">
+                                <option value="user">User</option>
+                                <option value="admin">Admin</option>
+                            </select>
+                        </div>
+                        <button class="btn btn-primary" type="submit"><i class="fas fa-user-plus"></i> Create</button>
+                    </form>
+                </div>
+            </div>
+
+            <div class="card fade-in" style="margin-top: 20px;">
+                <div class="card-header"><div class="card-title">Users</div></div>
+                <div class="card-body" style="padding: 0; overflow-x: auto;">
+                    <table class="data-table">
+                        <thead>
+                            <tr><th>ID</th><th>Username</th><th>Role</th><th>Status</th><th>Created</th><th>Actions</th></tr>
+                        </thead>
+                        <tbody>
+                            {% for user in users %}
+                            <tr>
+                                <td>{{ user['id'] }}</td>
+                                <td>{{ user['username'] }}</td>
+                                <td>{{ user['role'] }}</td>
+                                <td>{{ 'Banned' if user['is_banned'] else 'Active' }}</td>
+                                <td>{{ user['created_at'] }}</td>
+                                <td>
+                                    <form method="POST" action="{{ url_for('admin_ban_user', user_id=user['id']) }}" style="display:inline;">
+                                        <button class="btn btn-{{ 'success' if user['is_banned'] else 'secondary' }} btn-sm">
+                                            <i class="fas fa-{{ 'unlock' if user['is_banned'] else 'ban' }}"></i>
+                                            {{ 'Unban' if user['is_banned'] else 'Ban' }}
+                                        </button>
+                                    </form>
+                                    {% if user['id'] != current_user['id'] %}
+                                    <form method="POST" action="{{ url_for('admin_delete_user', user_id=user['id']) }}" style="display:inline;" onsubmit="return confirm('Delete {{ user['username'] }} and all of their bots?');">
+                                        <button class="btn btn-danger btn-sm"><i class="fas fa-trash"></i></button>
+                                    </form>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="card fade-in" style="margin-top: 20px;">
+                <div class="card-header"><div class="card-title">Bots</div></div>
+                <div class="card-body" style="padding: 0; overflow-x: auto;">
+                    <table class="data-table">
+                        <thead>
+                            <tr><th>ID</th><th>Owner</th><th>Name</th><th>Entry</th><th>Status</th><th>Restarts</th><th>Actions</th></tr>
+                        </thead>
+                        <tbody>
+                            {% for bot in bots %}
+                            <tr>
+                                <td>{{ bot['id'] }}</td>
+                                <td>{{ bot['username'] }}</td>
+                                <td>{{ bot['name'] }}</td>
+                                <td style="font-family:'JetBrains Mono',monospace;font-size:12px;">{{ bot['entry_point'] or '—' }}</td>
+                                <td>{{ badge(bot['status']) }}</td>
+                                <td>{{ bot['restarts'] }}</td>
+                                <td style="white-space: nowrap;">
+                                    <form method="POST" action="{{ url_for('admin_approve_bot', bot_id=bot['id']) }}" style="display:inline;">
+                                        <button class="btn btn-success btn-sm" title="Approve"><i class="fas fa-check"></i></button>
+                                    </form>
+                                    <form method="POST" action="{{ url_for('admin_reject_bot', bot_id=bot['id']) }}" style="display:inline;">
+                                        <button class="btn btn-secondary btn-sm" title="Reject"><i class="fas fa-times"></i></button>
+                                    </form>
+                                    <form method="POST" action="{{ url_for('admin_stop_bot', bot_id=bot['id']) }}" style="display:inline;">
+                                        <button class="btn btn-secondary btn-sm" title="Stop"><i class="fas fa-stop"></i></button>
+                                    </form>
+                                    <form method="POST" action="{{ url_for('admin_delete_bot', bot_id=bot['id']) }}" style="display:inline;" onsubmit="return confirm('Delete this bot?');">
+                                        <button class="btn btn-danger btn-sm" title="Delete"><i class="fas fa-trash"></i></button>
+                                    </form>
+                                </td>
+                            </tr>
+                            {% else %}
+                            <tr><td colspan="7" style="text-align:center;color:var(--text-secondary);">No bots yet.</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </main>
+</div>
+{% endblock %}

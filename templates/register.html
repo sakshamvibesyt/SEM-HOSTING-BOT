@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% from "_macros.html" import flash_messages with context %}
+{% block title %}Register - GX Host{% endblock %}
+{% block page_css %}
+{% include "_css/register.css" %}
+{% endblock %}
+
+{% block body %}
+<div class="login-page">
+    <div class="login-card fade-in">
+        <div class="login-logo">
+            <div class="logo-icon"><i class="fas fa-user-astronaut"></i></div>
+            <div class="logo-text">JOIN THE NODE</div>
+            <div class="logo-subtitle">Create Your Account</div>
+        </div>
+
+        {{ flash_messages() }}
+
+        <form method="POST" action="{{ url_for('register') }}">
+            <div class="cyber-group">
+                <label class="cyber-label"><i class="fas fa-user-astronaut"></i> Username</label>
+                <div class="input-box">
+                    <input type="text" name="username" class="cyber-input" placeholder="Choose a unique username" required autofocus autocomplete="username" minlength="3" maxlength="32">
+                    <i class="fas fa-user input-icon"></i>
+                </div>
+            </div>
+
+            <div class="cyber-group">
+                <label class="cyber-label"><i class="fas fa-lock"></i> Password</label>
+                <div class="input-box">
+                    <input type="password" name="password" class="cyber-input" placeholder="Minimum 6 characters" required minlength="6" autocomplete="new-password">
+                    <i class="fas fa-key input-icon"></i>
+                </div>
+            </div>
+
+            <button type="submit" class="btn-launch">
+                <i class="fas fa-user-plus"></i> Create Account
+            </button>
+        </form>
+
+        <div class="cyber-divider">or</div>
+
+        <div style="text-align: center;">
+            <p style="font-size: 13px; color: var(--text-dim); margin-bottom: 12px;">Already registered on this node?</p>
+            <a href="{{ url_for('login') }}" class="btn-ghost-login">
+                <i class="fas fa-sign-in-alt"></i> Sign In to Account
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}

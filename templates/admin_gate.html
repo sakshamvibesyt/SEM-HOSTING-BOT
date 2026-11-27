@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% from "_macros.html" import flash_messages, sidebar with context %}
+{% block title %}Admin - GX Host{% endblock %}
+{% block page_css %}
+{% include "_css/dashboard.css" %}
+{% endblock %}
+
+{% block body %}
+<div class="app-container">
+    {{ sidebar('admin') }}
+
+    <main class="main-content" style="flex: 1; height: 100vh; overflow-y: auto;">
+        <div class="top-bar">
+            <div class="top-bar-left">
+                <button class="menu-toggle" onclick="toggleSidebar()"><i class="fas fa-bars"></i></button>
+                <h1 class="page-title">Admin <span>Authentication</span></h1>
+            </div>
+        </div>
+
+        <div class="content-area">
+            {{ flash_messages() }}
+
+            <div class="card fade-in" style="max-width: 500px; margin: 60px auto;">
+                <div class="card-header" style="text-align: center;">
+                    <div style="width: 64px; height: 64px; background: var(--accent-gradient); border-radius: 20px; display: flex; align-items: center; justify-content: center; margin: 0 auto 16px; color: white; font-size: 28px;">
+                        <i class="fas fa-shield-alt"></i>
+                    </div>
+                    <div class="card-title" style="font-size: 20px;">Admin Authentication</div>
+                    <div style="font-size: 13px; color: var(--text-secondary); margin-top: 4px;">Enter admin password to access the panel</div>
+                </div>
+                <div class="card-body">
+                    <form method="POST" action="{{ url_for('admin_access') }}">
+                        <div class="form-group">
+                            <label class="form-label"><i class="fas fa-lock"></i> Admin Password</label>
+                            <input type="password" name="password" class="form-input" placeholder="Enter admin password" required autofocus>
+                        </div>
+                        <button type="submit" class="btn btn-primary w-full">
+                            <i class="fas fa-unlock"></i> Unlock Admin Panel
+                        </button>
+                    </form>
+                    <div style="text-align: center; margin-top: 16px;">
+                        <a href="{{ url_for('dashboard') }}" class="btn btn-secondary" style="font-size: 13px;">
+                            <i class="fas fa-arrow-left"></i> Back to Dashboard
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+</div>
+{% endblock %}

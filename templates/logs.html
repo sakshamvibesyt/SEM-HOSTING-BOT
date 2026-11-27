@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+{% from "_macros.html" import flash_messages, sidebar, badge with context %}
+{% block title %}Logs {{ bot['name'] }} - GX Host{% endblock %}
+{% block page_css %}
+{% include "_css/logs.css" %}
+{% endblock %}
+
+{% block body %}
+<div class="app-container">
+    {{ sidebar('dashboard') }}
+
+    <main class="main-content" style="flex: 1; height: 100vh; overflow-y: auto;">
+        <div class="top-bar">
+            <div class="top-bar-left">
+                <button class="menu-toggle" onclick="toggleSidebar()"><i class="fas fa-bars"></i></button>
+                <h1 class="page-title">Bot <span>Logs</span></h1>
+            </div>
+            <div class="top-actions">
+                {{ badge(bot['status']) }}
+                <a href="{{ url_for('dashboard') }}" class="btn btn-secondary"><i class="fas fa-arrow-left"></i> <span>Dashboard</span></a>
+            </div>
+        </div>
+
+        <div class="content-area">
+            {{ flash_messages() }}
+
+            <div class="card fade-in">
+                <div class="card-header">
+                    <div>
+                        <div class="card-title">{{ bot['name'] }}</div>
+                        <div style="font-size: 12px; color: var(--text-secondary); font-family: 'JetBrains Mono', monospace; margin-top: 4px;">
+                            {{ bot['uid'] }} · entry {{ bot['entry_point'] or '—' }} · restarts {{ bot['restarts'] }}
+                        </div>
+                    </div>
+                    <button class="btn btn-secondary btn-sm" onclick="reloadLog()"><i class="fas fa-redo"></i> Refresh</button>
+                </div>
+                <div class="card-body">
+                    <div class="log-container" id="logBox">{{ log if log else 'No logs yet. Start the bot to see output here.' }}</div>
+
+                    {% if bot['status'] == 'running' %}
+                    <form method="POST" action="{{ url_for('send_input', bot_id=bot['id']) }}" style="padding: 16px 0 0 0; display: flex; gap: 10px; flex-wrap: wrap;">
+                        <input type="text" name="text" class="form-input" placeholder="Send a line to the bot's stdin..." style="flex: 1; min-width: 220px;" autocomplete="off">
+                        <button class="btn btn-primary" type="submit"><i class="fas fa-paper-plane"></i> Send</button>
+                    </form>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="card fade-in" style="margin-top: 20px;">
+                <div class="card-header">
+                    <div class="card-title">Files in this bot</div>
+                </div>
+                <div class="card-body" style="padding: 0;">
+                    {% for file in files %}
+                    <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px 14px; border-bottom: 1px solid var(--border-color); gap: 8px; flex-wrap: wrap;">
+                        <span style="font-family: 'JetBrains Mono', monospace; font-size: 12.5px; color: var(--text-primary);">
+                            <i class="fas fa-file-code" style="color: var(--accent-cyan); margin-right: 6px;"></i>{{ file.name }}
+                        </span>
+                        <div style="display: flex; gap: 6px; align-items: center;">
+                            <span style="font-size: 12px; color: var(--text-secondary);">{{ file.size|human_size }}</span>
+                            <a class="btn btn-secondary btn-sm" href="{{ url_for('download_file', bot_id=bot['id'], relpath=file.name) }}"><i class="fas fa-download"></i> Download</a>
+                            {% if not file.is_entry %}
+                            <form method="post" action="{{ url_for('delete_file', bot_id=bot['id'], relpath=file.name) }}" style="display: inline;" onsubmit="return confirm('Delete this file?');">
+                                <button class="btn btn-danger btn-sm"><i class="fas fa-trash"></i> Delete</button>
+                            </form>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% else %}
+                    <div style="padding: 24px; text-align: center; color: var(--text-secondary); font-size: 13px;">No files.</div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </main>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function reloadLog() {
+    fetch('/logs_raw/{{ bot["id"] }}')
+        .then(r => r.text())
+        .then(text => {
+            const box = document.getElementById('logBox');
+            box.textContent = text || 'No logs yet.';
+            box.scrollTop = box.scrollHeight;
+        });
+}
+document.getElementById('logBox').scrollTop = document.getElementById('logBox').scrollHeight;
+{% if bot['status'] == 'running' %}setInterval(reloadLog, 3000);{% endif %}
+</script>
+{% endblock %}

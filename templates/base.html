@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}GX Host{% endblock %}</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+{% include "_css/base.css" %}
+{% block page_css %}{% endblock %}
+    </style>
+</head>
+<body>
+{% block body %}{% endblock %}
+    <script>
+        function toggleSidebar() {
+            var sidebar = document.getElementById('appSidebar');
+            var overlay = document.getElementById('sidebarOverlay');
+            if (sidebar) sidebar.classList.toggle('open');
+            if (overlay) overlay.classList.toggle('active');
+        }
+
+        function dismissFlash(el) {
+            el.style.opacity = '0';
+            el.style.transform = 'translateX(100%)';
+            setTimeout(function () { el.remove(); }, 300);
+        }
+
+        document.addEventListener('DOMContentLoaded', function () {
+            document.querySelectorAll('.flash-message').forEach(function (flash) {
+                setTimeout(function () { dismissFlash(flash); }, 5000);
+            });
+        });
+    </script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>
