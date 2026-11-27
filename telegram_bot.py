@@ -1,4 +1,4 @@
-"""GXHOST Telegram bot: account signup/login and hosting controls."""
+"""Private hosting assistant: account signup/login and hosting controls."""
 from __future__ import annotations
 
 import asyncio
@@ -24,6 +24,8 @@ PANEL_URL = os.environ.get("PANEL_URL", "https://sem-hosting-bot.onrender.com/")
 WELCOME_VIDEO_URL = os.environ.get("WELCOME_VIDEO_URL", "").strip()
 UPDATES_URL = os.environ.get("UPDATES_URL", "").strip()
 SUPPORT_URL = os.environ.get("SUPPORT_URL", "").strip()
+FORCE_SUB_CHANNEL = os.environ.get("FORCE_SUB_CHANNEL", "@drama_fonts").strip()
+FORCE_SUB_URL = os.environ.get("FORCE_SUB_URL", "https://t.me/drama_fonts").strip()
 OWNER_USERNAME = os.environ.get("OWNER_USERNAME", "drama_404x").strip().lstrip("@")
 OWNER_ID = os.environ.get("OWNER_ID", "9282845729").strip()
 USERNAME_RE = re.compile(r"^[A-Za-z0-9_.-]{3,32}$")
@@ -55,51 +57,124 @@ def _user_keyboard():
     return InlineKeyboardMarkup([
         [InlineKeyboardButton("📂 Upload Bot", callback_data="user:upload"),
          InlineKeyboardButton("🤖 My Bots", callback_data="user:bots")],
-        [InlineKeyboardButton("🌐 Open GXHOST Panel", url=PANEL_URL)],
+        [InlineKeyboardButton("🌐 Open Hosting Panel", url=PANEL_URL)],
         [InlineKeyboardButton("❔ Help", callback_data="help")],
     ])
 
 
+def _full_welcome(first: str) -> str:
+    return (
+        "╭━━━〔 ⚡ 𝐏𝐑𝐈𝐕𝐀𝐓𝐄 𝐇𝐎𝐒𝐓𝐈𝐍𝐆 ⚡ 〕━━━╮\\n\\n"
+        "       🖤 𝐖𝐄𝐋𝐂𝐎𝐌𝐄 𝐓𝐎\\n"
+        "❛ ⤹⌯ ᯓ𓆰 𝐃 ꧊᱂ ᧘ ϻ ᧘ 𖤍 ➛🇨🇦 𝐇𝐨𝐬𝐭𝐢𝐧𝐠\\n\\n"
+        "╰━━━━━━━━━━━━━━━━━━━━━━━━━━╯\\n\\n"
+        f"⌁ 𝐀𝐂𝐂𝐄𝐒𝐒 𝐆𝐑𝐀𝐍𝐓𝐄𝐃, {first}\\n\\n"
+        "💻 Your personal hosting terminal is ready.\\n"
+        "Deploy, monitor and control your Python bots from Telegram.\\n\\n"
+        "୨୧ ━━━ 𝐒𝐘𝐒𝐓𝐄𝐌 𝐅𝐄𝐀𝐓𝐔𝐑𝐄𝐒 ━━━ ୨୧\\n\\n"
+        "⚡ Instant Bot Deployment\\n"
+        "📂 Secure File Management\\n"
+        "🖥 Live Console & Logs\\n"
+        "🔄 Start / Stop / Restart\\n"
+        "🛡 Account Authentication\\n"
+        "📊 Hosting Statistics\\n\\n"
+        "୨୧ ━━━ 𝐒𝐘𝐒𝐓𝐄𝐌 𝐎𝐖𝐍𝐄𝐑 ━━━ ୨୧\\n\\n"
+        f"👑 @{OWNER_USERNAME}\\n\\n"
+        "⌁ 𝐂𝐎𝐃𝐄 • 𝐃𝐄𝐏𝐋𝐎𝐘 • 𝐂𝐎𝐍𝐓𝐑𝐎𝐋"
+    )
+
+
+def _compact_welcome(first: str) -> str:
+    return (
+        "╭━━━〔 ⚡ 𝐇𝐎𝐒𝐓𝐈𝐍𝐆 𝐒𝐘𝐒𝐓𝐄𝐌 ⚡ 〕━━━╮\\n"
+        f"⌁ ACCESS GRANTED, {first}\\n"
+        "💻 Your bot deployment terminal is ready.\\n"
+        "⚡ Deploy • Manage • Monitor\\n"
+        "╰━━━━━━━━━━━━━━━━━━━━━━━━━━╯"
+    )
+
+
+def _welcome_keyboard(expanded: bool, authenticated: bool):
+    rows = [[InlineKeyboardButton(
+        "📕 COLLAPSE MESSAGE" if expanded else "📖 READ FULL MESSAGE",
+        callback_data="welcome:collapse" if expanded else "welcome:expand"
+    )]]
+    rows.extend((_user_keyboard() if authenticated else _auth_keyboard()).inline_keyboard)
+    return InlineKeyboardMarkup(rows)
+
+
+async def _is_subscribed(update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
+    user = update.effective_user
+    if not user:
+        return False
+    try:
+        member = await context.bot.get_chat_member(FORCE_SUB_CHANNEL, user.id)
+        return member.status in ("member", "administrator", "creator")
+    except Exception:
+        log.exception("Force-join check failed for %s; confirm bot is admin in channel", FORCE_SUB_CHANNEL)
+        return False
+
+
+async def _require_subscription(update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
+    if await _is_subscribed(update, context):
+        return True
+    keyboard = InlineKeyboardMarkup([
+        [InlineKeyboardButton("📢 JOIN CHANNEL", url=FORCE_SUB_URL)],
+        [InlineKeyboardButton("🔄 I HAVE JOINED", callback_data="force:check")],
+    ])
+    message = (
+        "╭━━━〔 🔒 CHANNEL VERIFICATION 〕━━━╮\\n\\n"
+        "Join our official channel to unlock the hosting assistant.\\n"
+        "After joining, tap I HAVE JOINED.\\n\\n"
+        "╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯"
+    )
+    if update.callback_query:
+        await update.callback_query.message.reply_text(message, reply_markup=keyboard)
+    else:
+        await update.effective_message.reply_text(message, reply_markup=keyboard)
+    return False
+
+
 async def _send_welcome(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
-    first = user.first_name if user and user.first_name else "there"
-    caption = (
-        f"💗 Hey {first}!\n\n"
-        "Welcome to *GXHOST Hosting* ✨\n"
-        "Your personal bot hosting assistant is ready!\n\n"
-        "🚀 Upload and manage your Python bots\n"
-        "📂 Access your bot files\n"
-        "⚡ Start, stop and restart your bots\n"
-        "📊 Check status and live logs\n\n"
-        "Choose an option below to get started."
+    first = user.first_name if user and user.first_name else "USER"
+    authenticated = _linked(update) is not None
+    message = await update.effective_message.reply_text(
+        "⌁ Initializing secure hosting terminal...\\n[□□□□□□] 0%"
     )
-    markup = _user_keyboard() if _linked(update) else _auth_keyboard()
-    if WELCOME_VIDEO_URL:
+    stages = [
+        "⌁ Initializing secure hosting terminal...\\n[■■□□□□] 33%",
+        "⌁ Loading deployment modules...\\n[■■■■□□□□] 66%",
+        "⌁ Authentication gateway ready...\\n[■■■■■■■■] 100%",
+        _full_welcome(first),
+    ]
+    for stage in stages:
+        await asyncio.sleep(0.20)
         try:
-            await update.effective_message.reply_video(
-                video=WELCOME_VIDEO_URL, caption=caption,
-                parse_mode="Markdown", reply_markup=markup,
-            )
-            return
+            await message.edit_text(stage)
         except Exception:
-            log.exception("Welcome video could not be sent; falling back to text")
-    await update.effective_message.reply_text(
-        caption, parse_mode="Markdown", reply_markup=markup
+            pass
+    await asyncio.sleep(0.45)
+    await message.edit_text(
+        _compact_welcome(first),
+        reply_markup=_welcome_keyboard(False, authenticated),
     )
 
 
 async def start_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data.pop("auth_state", None)
     context.user_data.pop("auth_mode", None)
+    if not await _require_subscription(update, context):
+        return
     await _send_welcome(update, context)
 
 
 async def pannel_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = InlineKeyboardMarkup([[
-        InlineKeyboardButton("🌐 Open GXHOST Panel", url=PANEL_URL)
+        InlineKeyboardButton("🌐 Open Hosting Panel", url=PANEL_URL)
     ]])
     await update.effective_message.reply_text(
-        "🚀 *GXHOST CONTROL PANEL*\n\n"
+        "⚡ *HOSTING CONTROL PANEL*\n\n"
         "Your hosting dashboard is ready.\n"
         "📌 Panel URL: " + PANEL_URL + "\n\n"
         "Tap the button below to open your panel. 💙",
@@ -112,7 +187,7 @@ async def _ask_username(query, context, mode: str):
     context.user_data["auth_state"] = WAIT_USERNAME
     await query.message.reply_text(
         "👤 *Enter your username*\n\n"
-        "Please send your GXHOST username.",
+        "Please send your hosting username.",
         parse_mode="Markdown",
     )
 
@@ -121,13 +196,30 @@ async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     data = query.data or ""
+    if data == "force:check":
+        if await _is_subscribed(update, context):
+            await query.message.reply_text("✅ CHANNEL VERIFIED • ACCESS GRANTED")
+            await _send_welcome(update, context)
+        else:
+            await query.answer("Please join @drama_fonts first.", show_alert=True)
+        return
+    if data in ("welcome:expand", "welcome:collapse"):
+        first = update.effective_user.first_name if update.effective_user else "USER"
+        expanded = data == "welcome:expand"
+        await query.message.edit_text(
+            _full_welcome(first) if expanded else _compact_welcome(first),
+            reply_markup=_welcome_keyboard(expanded, _linked(update) is not None),
+        )
+        return
+    if not await _require_subscription(update, context):
+        return
     if data == "auth:login":
         await _ask_username(query, context, "login")
     elif data == "auth:signup":
         await _ask_username(query, context, "signup")
     elif data == "help":
         await query.message.reply_text(
-            "✨ *GXHOST Help*\n\n"
+            "⚡ *HOSTING HELP*\n\n"
             "• Login or Sign Up to access your account.\n"
             "• Use /upload, then send a `.py` or `.zip` file.\n"
             "• Use /bots to view your bots.\n"
@@ -262,7 +354,7 @@ async def bots_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "📂 Abhi koi bot upload nahi hua.\n/upload bhejo, phir .py ya .zip file send karo."
         )
         return
-    lines = [f"🤖 Your GXHOST bots ({len(bots)}):"]
+    lines = [f"🤖 Your hosting bots ({len(bots)}):"]
     lines.extend(f"{b['id']} · {b['name']} · {b['status']}" for b in bots[:40])
     await update.effective_message.reply_text("\n".join(lines))
 
@@ -332,7 +424,7 @@ async def document_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "Open your panel to finish setup if needed.",
             parse_mode="Markdown",
             reply_markup=InlineKeyboardMarkup([[
-                InlineKeyboardButton("🌐 Open GXHOST Panel", url=PANEL_URL)
+                InlineKeyboardButton("🌐 Open Hosting Panel", url=PANEL_URL)
             ]]),
         )
     except Exception as exc:
@@ -360,7 +452,7 @@ async def control_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     action = update.effective_message.text.split()[0].split("@")[0].lstrip("/")
     aliases = {"startbot": "start", "stopbot": "stop", "restartbot": "restart"}
     if not user or len(context.args) != 1 or not context.args[0].isdigit():
-        await update.effective_message.reply_text(f"Usage: /{action} BOT_ID (login first)")
+        await update.effective_message.reply_text(f"Usage: /{action} BOT_ID — login first if not authenticated")
         return
     bot = db.get_bot(int(context.args[0]), user["id"])
     if not bot:
