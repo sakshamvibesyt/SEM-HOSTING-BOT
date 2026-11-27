@@ -123,10 +123,9 @@ async def _require_subscription(update: Update, context: ContextTypes.DEFAULT_TY
         [InlineKeyboardButton("🔄 I HAVE JOINED", callback_data="force:check")],
     ])
     message = (
-        "╭━━━〔 🔒 CHANNEL VERIFICATION 〕━━━╮\\n\\n"
-        "Join our official channel to unlock the hosting assistant.\\n"
-        "After joining, tap I HAVE JOINED.\\n\\n"
-        "╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯"
+        "📢 *Channel Join Required*\n\n"
+        "Hosting bot use karne ke liye pehle hamara official channel join karein.\n"
+        "Join karne ke baad *I HAVE JOINED* par tap karein."
     )
     if update.callback_query:
         await update.callback_query.message.reply_text(message, reply_markup=keyboard)
@@ -137,27 +136,29 @@ async def _require_subscription(update: Update, context: ContextTypes.DEFAULT_TY
 
 async def _send_welcome(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
-    first = user.first_name if user and user.first_name else "USER"
-    authenticated = _linked(update) is not None
-    message = await update.effective_message.reply_text(
-        "⌁ Initializing secure hosting terminal...\\n[□□□□□□] 0%"
+    first = user.first_name if user and user.first_name else "there"
+    caption = (
+        f"💗 Hey {first}!\n\n"
+        "Welcome to *GXHOST Hosting* ✨\n"
+        "Your personal bot hosting assistant is ready!\n\n"
+        "🚀 Upload and manage your Python bots\n"
+        "📂 Access your bot files\n"
+        "⚡ Start, stop and restart your bots\n"
+        "📊 Check status and live logs\n\n"
+        "Choose an option below to get started."
     )
-    stages = [
-        "⌁ Initializing secure hosting terminal...\\n[■■□□□□] 33%",
-        "⌁ Loading deployment modules...\\n[■■■■□□□□] 66%",
-        "⌁ Authentication gateway ready...\\n[■■■■■■■■] 100%",
-        _full_welcome(first),
-    ]
-    for stage in stages:
-        await asyncio.sleep(0.20)
+    markup = _user_keyboard() if _linked(update) else _auth_keyboard()
+    if WELCOME_VIDEO_URL:
         try:
-            await message.edit_text(stage)
+            await update.effective_message.reply_video(
+                video=WELCOME_VIDEO_URL, caption=caption,
+                parse_mode="Markdown", reply_markup=markup,
+            )
+            return
         except Exception:
-            pass
-    await asyncio.sleep(0.45)
-    await message.edit_text(
-        _compact_welcome(first),
-        reply_markup=_welcome_keyboard(False, authenticated),
+            log.exception("Welcome video could not be sent; falling back to text")
+    await update.effective_message.reply_text(
+        caption, parse_mode="Markdown", reply_markup=markup
     )
 
 
@@ -194,15 +195,15 @@ async def _ask_username(query, context, mode: str):
 
 async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
-    await query.answer()
     data = query.data or ""
     if data == "force:check":
         if await _is_subscribed(update, context):
-            await query.message.reply_text("✅ CHANNEL VERIFIED • ACCESS GRANTED")
+            await query.answer("Verified!")
             await _send_welcome(update, context)
         else:
             await query.answer("Please join @drama_fonts first.", show_alert=True)
         return
+    await query.answer()
     if data in ("welcome:expand", "welcome:collapse"):
         first = update.effective_user.first_name if update.effective_user else "USER"
         expanded = data == "welcome:expand"
