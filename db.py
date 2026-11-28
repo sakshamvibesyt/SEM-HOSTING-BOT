@@ -303,7 +303,25 @@ def init_telegram_tables() -> None:
             linked_at TEXT NOT NULL,
             FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
         );
+        CREATE TABLE IF NOT EXISTS app_settings (
+            setting_key TEXT PRIMARY KEY,
+            setting_value TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        );
         """)
+
+
+def get_setting(key: str, default: str = "") -> str:
+    row = _one("SELECT setting_value FROM app_settings WHERE setting_key = ?", (key,))
+    return str(row["setting_value"]) if row else default
+
+
+def set_setting(key: str, value: str) -> None:
+    _write(
+        "INSERT INTO app_settings(setting_key, setting_value, updated_at) VALUES (?, ?, ?) "
+        "ON CONFLICT(setting_key) DO UPDATE SET setting_value=excluded.setting_value, updated_at=excluded.updated_at",
+        (key, value, utc_now()),
+    )
 
 
 def create_telegram_pair_code(user_id: int, code: str, expires_at: int) -> None:

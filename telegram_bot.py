@@ -17,6 +17,7 @@ from telegram.ext import (
 
 import botmanager
 import db
+import backup
 
 log = logging.getLogger(__name__)
 _APP = None
@@ -44,17 +45,28 @@ def _linked(update: Update):
     return db.get_user_by_telegram_chat(chat.id) if chat else None
 
 
-def _auth_keyboard():
-    rows = [
-        [InlineKeyboardButton("🔐 Login", callback_data="auth:login"),
-         InlineKeyboardButton("✨ Sign Up", callback_data="auth:signup")],
-        [InlineKeyboardButton("❔ Help", callback_data="help")],
-    ]
+def _social_rows():
+    row = []
     if UPDATES_URL:
-        rows.append([InlineKeyboardButton("📢 Updates", url=UPDATES_URL)])
+        row.append(InlineKeyboardButton("✦ 𝐔𝐏𝐃𝐀𝐓𝐄𝐒", url=UPDATES_URL))
     if SUPPORT_URL:
-        rows.append([InlineKeyboardButton("💬 Support", url=SUPPORT_URL)])
-    rows.append([InlineKeyboardButton("👑 Owner", url=f"https://t.me/{OWNER_USERNAME}")])
+        row.append(InlineKeyboardButton("☏ 𝐒𝐔𝐏𝐏𝐎𝐑𝐓", url=SUPPORT_URL))
+    rows = [row] if row else []
+    rows.append([InlineKeyboardButton("♛ 𝐎𝐖𝐍𝐄𝐑", url=f"https://t.me/{OWNER_USERNAME}")])
+    return rows
+
+
+def _auth_keyboard():
+    rows = [[InlineKeyboardButton("🔐 𝐋𝐎𝐆𝐈𝐍", callback_data="auth:login"),
+             InlineKeyboardButton("✧ 𝐑𝐄𝐆𝐈𝐒𝐓𝐄𝐑", callback_data="auth:signup")]]
+    rows.extend(_social_rows())
+    rows.append([InlineKeyboardButton("❔ 𝐇𝐄𝐋𝐏", callback_data="help")])
+    return InlineKeyboardMarkup(rows)
+
+
+def _entry_keyboard():
+    rows = [[InlineKeyboardButton("✦ 𝐔𝐒𝐄 𝐌𝐄 ✦", callback_data="entry:open")]]
+    rows.extend(_social_rows())
     return InlineKeyboardMarkup(rows)
 
 
@@ -199,7 +211,7 @@ async def _send_welcome(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"👑 <tg-spoiler><a href=\"https://t.me/{OWNER_USERNAME}\">@{OWNER_USERNAME}</a></tg-spoiler>\n"
         "       ⌁ 𝐒𝐓𝐀𝐘 𝐂𝐔𝐓𝐄. 𝐒𝐓𝐀𝐘 𝐂𝐘𝐁𝐄𝐑. ♡"
     )
-    markup = _user_keyboard() if _linked(update) else _auth_keyboard()
+    markup = _entry_keyboard()
     if WELCOME_VIDEO_URL:
         try:
             await update.effective_chat.send_video(
@@ -221,7 +233,8 @@ async def _start_reaction(context: ContextTypes.DEFAULT_TYPE, chat_id: int, mess
         await context.bot.set_message_reaction(
             chat_id=chat_id,
             message_id=message_id,
-            reaction=[ReactionTypeEmoji(emoji="👾")],
+            reaction=[ReactionTypeEmoji(emoji="🦄")],
+            is_big=True,
         )
     except Exception:
         log.debug("Start reaction unavailable for this chat", exc_info=True)
@@ -251,6 +264,17 @@ async def _run_start_sequence(update: Update, context: ContextTypes.DEFAULT_TYPE
         await animation.delete()
     except Exception:
         pass
+    # Owner-configured start media: only one type is stored at a time.
+    media_kind = db.get_setting("start_media_kind", "")
+    media_id = db.get_setting("start_media_id", "")
+    if media_id and media_kind in ("sticker", "gif"):
+        try:
+            if media_kind == "sticker":
+                await chat.send_sticker(sticker=media_id)
+            else:
+                await chat.send_animation(animation=media_id)
+        except Exception:
+            log.exception("Configured start media could not be sent")
     await _send_welcome(update, context)
 
 
@@ -262,6 +286,73 @@ async def start_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await _require_subscription(update, context):
         return
     await _run_start_sequence(update, context)
+
+
+def _is_owner(update: Update) -> bool:
+    user = update.effective_user
+    if not user:
+        return False
+    return str(user.id) == OWNER_ID or user.username == OWNER_USERNAME
+
+
+async def _set_media_command(update: Update, context: ContextTypes.DEFAULT_TYPE, kind: str):
+    if not _is_owner(update):
+        await update.effective_message.reply_text("⛔ This command is reserved for the bot owner.")
+        return
+    context.user_data["await_start_media"] = kind
+    label = "sticker" if kind == "sticker" else "GIF animation"
+    await update.effective_message.reply_text(
+        f"✦ Send the {label} now. It will replace the currently active start media.\n\n"
+        "Only one start media item can be active at a time."
+    )
+
+
+async def setsticker_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await _set_media_command(update, context, "sticker")
+
+
+async def setgif_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await _set_media_command(update, context, "gif")
+
+
+async def set_start_media_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    kind = context.user_data.get("await_start_media")
+    if not kind:
+        return
+    if not _is_owner(update):
+        context.user_data.pop("await_start_media", None)
+        return
+    message = update.effective_message
+    if kind == "sticker" and message.sticker:
+        media_id = message.sticker.file_id
+    elif kind == "gif" and message.animation:
+        media_id = message.animation.file_id
+    else:
+        await message.reply_text("⚠️ Media type mismatch. Use /setsticker for a sticker or /setgif for an animated GIF.")
+        return
+    db.set_setting("start_media_kind", kind)
+    db.set_setting("start_media_id", media_id)
+    # Persist the setting promptly to the configured MongoDB snapshot store.
+    backup.request_backup()
+    context.user_data.pop("await_start_media", None)
+    await message.reply_text(
+        "✅ Start sticker saved. Previous GIF removed." if kind == "sticker"
+        else "✅ Start GIF saved. Previous sticker removed."
+    )
+
+
+async def help_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.effective_message.reply_text(
+        "╭━━━〔 ✦ 𝐃𝐑Λ𝐌Λ 𝐇𝐎𝐒𝐓𝐈𝐍𝐆 〕━━━╮\n\n"
+        "🔐 /start — Open the welcome menu\n"
+        "📂 /upload — Upload a bot file\n"
+        "🤖 /bots — View your bots\n"
+        "🌐 /pannel — Open the hosting panel\n"
+        "📊 /status BOT_ID — Check bot status\n"
+        "📜 /logs BOT_ID — View bot logs\n\n"
+        "Owner tools: /setsticker and /setgif\n"
+        "╰━━━━━━━━━━━━━━━━━━━━━━━━━━╯",
+    )
 
 
 async def pannel_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -303,6 +394,19 @@ async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await query.answer("Please join the required channel first.", show_alert=True)
         return
     await query.answer()
+    if data == "entry:open":
+        try:
+            await query.message.delete()
+        except Exception:
+            pass
+        await query.message.chat.send_message(
+            "╭━━━〔 ✦ 𝐀𝐂𝐂𝐎𝐔𝐍𝐓 𝐀𝐂𝐂𝐄𝐒𝐒 〕━━━╮\n\n"
+            "Choose how you want to continue.\n"
+            "Existing account? Login. New here? Register.\n"
+            "╰━━━━━━━━━━━━━━━━━━━━━━━━━━╯",
+            reply_markup=_auth_keyboard(),
+        )
+        return
     if data in ("welcome:expand", "welcome:collapse"):
         first = update.effective_user.first_name if update.effective_user else "USER"
         expanded = data == "welcome:expand"
@@ -654,6 +758,9 @@ def start_telegram_bot(flask_app) -> None:
         application = Application.builder().token(token).build()
         application.add_handler(TypeHandler(Update, force_join_gate), group=-1)
         application.add_handler(CommandHandler("start", start_cmd))
+        application.add_handler(CommandHandler("help", help_cmd))
+        application.add_handler(CommandHandler("setsticker", setsticker_cmd))
+        application.add_handler(CommandHandler("setgif", setgif_cmd))
         application.add_handler(CommandHandler("pannel", pannel_cmd))
         application.add_handler(CommandHandler("panel", pannel_cmd))
         application.add_handler(CommandHandler("link", link_cmd))
@@ -666,6 +773,7 @@ def start_telegram_bot(flask_app) -> None:
         application.add_handler(CommandHandler("files", files_cmd))
         application.add_handler(CommandHandler("getfile", getfile_cmd))
         application.add_handler(CallbackQueryHandler(callback_handler))
+        application.add_handler(MessageHandler(filters.Sticker | filters.ANIMATION, set_start_media_handler))
         application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, auth_text_handler))
         application.add_handler(MessageHandler(filters.Document.ALL, document_handler))
         await application.initialize()
