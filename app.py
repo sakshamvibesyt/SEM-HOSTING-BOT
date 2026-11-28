@@ -230,7 +230,7 @@ def inject_globals() -> dict[str, Any]:
         "current_user": user,
         "avatar_letter": (user["username"][0].upper() if user else "?"),
         "is_admin": admin_unlocked() if user else False,
-        "panel_name": os.environ.get("PANEL_NAME", "❛ ⤹⌯ ᯓ𓆰 𝐃 ꧊᱂ ᧘ ϻ ᧘ 𖤍 ➛🇨🇦 Hosting"),
+        "panel_name": os.environ.get("PANEL_NAME", "『 𝐃𝐑Λ𝐌Λ 』 𝐇𝐎𝐒𝐓𝐈𝐍𝐆"),
         "panel_tagline": os.environ.get("PANEL_TAGLINE", "SECURE BOT HOSTING"),
         "support_url": os.environ.get("SUPPORT_URL", "https://t.me/drama_404x"),
     }

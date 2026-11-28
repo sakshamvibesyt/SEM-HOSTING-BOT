@@ -42,7 +42,7 @@ services:
       - key: BACKUP_KEEP_COUNT
         value: "24"
       - key: PANEL_NAME
-        value: "❛ ⤹⌯ ᯓ𓆰 𝐃 ꧊᱂ ᧘ ϻ ᧘ 𖤍 ➛🇨🇦 Hosting"
+        value: "『 𝐃𝐑Λ𝐌Λ 』 𝐇𝐎𝐒𝐓𝐈𝐍𝐆"
       - key: SUPPORT_URL
         value: "https://t.me/drama_404x"
       - key: PANEL_URL

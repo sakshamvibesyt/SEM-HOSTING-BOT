@@ -267,3 +267,8 @@ private Environment Variables. Do not commit tokens or MongoDB credentials.
 The panel still requires one web worker/instance because bot processes are
 supervised locally. MongoDB protects accounts and files; it does not migrate
 running OS processes, so bots will need to be started again after a redeploy.
+
+
+## Drama Hosting branding and Telegram start flow
+
+Set `PANEL_NAME` in Render Environment to `『 𝐃𝐑Λ𝐌Λ 』 𝐇𝐎𝐒𝐓𝐈𝐍𝐆` and `PANEL_TAGLINE` to `CYBER NODE PANEL`. The Telegram `/start` flow reacts to the start message when supported, shows a short cyber-terminal boot animation, then sends the welcome. After force-join verification succeeds, the verification prompt is deleted before the boot animation and welcome are sent. The bot must be an administrator in the required channel so membership checks can work.

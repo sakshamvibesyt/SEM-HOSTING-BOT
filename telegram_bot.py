@@ -71,7 +71,7 @@ def _full_welcome(first: str) -> str:
     return (
         "╭━━━〔 ⚡ 𝐏𝐑𝐈𝐕𝐀𝐓𝐄 𝐇𝐎𝐒𝐓𝐈𝐍𝐆 ⚡ 〕━━━╮\n\n"
         "       🖤 𝐖𝐄𝐋𝐂𝐎𝐌𝐄 𝐓𝐎\n"
-        "❛ ⤹⌯ ᯓ𓆰 𝐃 ꧊᱂ ᧘ ϻ ᧘ 𖤍 ➛🇨🇦 𝐇𝐨𝐬𝐭𝐢𝐧𝐠\n\n"
+        "『 𝐃𝐑Λ𝐌Λ 』 𝐇𝐎𝐒𝐓𝐈𝐍𝐆\n\n"
         "╰━━━━━━━━━━━━━━━━━━━━━━━━━━╯\n\n"
         f"⌁ 𝐀𝐂𝐂𝐄𝐒𝐒 𝐆𝐑𝐀𝐍𝐓𝐄𝐃, {first}\n\n"
         "💻 Your personal hosting terminal is ready.\n"
@@ -132,7 +132,7 @@ async def _require_subscription(update: Update, context: ContextTypes.DEFAULT_TY
 
     # Cute cyber-terminal style verification caption (sent with the video).
     caption = (
-        "╭━━━〔 🖤 𝐒𝐄𝐌 𝐂𝐘𝐁𝐄𝐑 𝐇𝐎𝐒𝐓 〕━━━╮\n\n"
+        "╭━━━〔 🖤 𝐃𝐑Λ𝐌Λ 𝐇𝐎𝐒𝐓𝐈𝐍𝐆 〕━━━╮\n\n"
         "       ୨୧ 𝐇𝐄𝐘, 𝐂𝐘𝐁𝐄𝐑 𝐅𝐑𝐈𝐄𝐍𝐃! ♡\n\n"
         "⌁ 𝐒𝐘𝐒𝐓𝐄𝐌 𝐈𝐍𝐈𝐓𝐈𝐀𝐋𝐈𝐙𝐄𝐃...\n"
         "⌁ 𝐒𝐄𝐂𝐔𝐑𝐄 𝐂𝐎𝐍𝐍𝐄𝐂𝐓𝐈𝐎𝐍 ✓\n"
@@ -182,7 +182,7 @@ async def _send_welcome(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     first = html.escape(user.first_name if user and user.first_name else "Cyber Friend")
     caption = (
-        f"╭━━━〔 🖤 𝐒𝐄𝐌 𝐂𝐘𝐁𝐄𝐑 𝐇𝐎𝐒𝐓 〕━━━╮\n\n"
+        f"╭━━━〔 🖤 𝐃𝐑Λ𝐌Λ 𝐇𝐎𝐒𝐓𝐈𝐍𝐆 〕━━━╮\n\n"
         f"       ୨୧ 𝐖𝐄𝐋𝐂𝐎𝐌𝐄, {first}! ♡\n\n"
         "⌁ 𝐒𝐘𝐒𝐓𝐄𝐌 𝐒𝐓𝐀𝐓𝐔𝐒: <b>ONLINE</b> ✓\n"
         "⌁ 𝐒𝐄𝐂𝐔𝐑𝐄 𝐒𝐄𝐒𝐒𝐈𝐎𝐍: <b>ACTIVE</b> ✓\n"
@@ -202,24 +202,66 @@ async def _send_welcome(update: Update, context: ContextTypes.DEFAULT_TYPE):
     markup = _user_keyboard() if _linked(update) else _auth_keyboard()
     if WELCOME_VIDEO_URL:
         try:
-            await update.effective_message.reply_video(
+            await update.effective_chat.send_video(
                 video=WELCOME_VIDEO_URL, caption=caption,
                 parse_mode="HTML", reply_markup=markup,
             )
             return
         except Exception:
             log.exception("Welcome video could not be sent; falling back to text")
-    await update.effective_message.reply_text(
-        caption, parse_mode="HTML", reply_markup=markup,
+    await update.effective_chat.send_message(
+        text=caption, parse_mode="HTML", reply_markup=markup,
         disable_web_page_preview=True,
     )
+
+async def _start_reaction(context: ContextTypes.DEFAULT_TYPE, chat_id: int, message_id: int):
+    """Best-effort Telegram reaction; keep working on clients/chats without reactions."""
+    try:
+        from telegram import ReactionTypeEmoji
+        await context.bot.set_message_reaction(
+            chat_id=chat_id,
+            message_id=message_id,
+            reaction=[ReactionTypeEmoji(emoji="👾")],
+        )
+    except Exception:
+        log.debug("Start reaction unavailable for this chat", exc_info=True)
+
+
+async def _run_start_sequence(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Show a short cyber-terminal boot animation, then the actual welcome."""
+    message = update.effective_message
+    chat = update.effective_chat
+    if not message or not chat:
+        return
+    frames = [
+        "<b>DRAMAX // SECURE GATEWAY</b>\n\n<code>[■□□□□□□□□□] 10%</code>\n⌁ Initializing secure session...",
+        "<b>DRAMAX // SYSTEM SCAN</b>\n\n<code>[■■■■□□□□□□] 40%</code>\n⌁ Checking access nodes...\n⌁ Encrypting connection...",
+        "<b>DRAMAX // AUTHENTICATION</b>\n\n<code>[■■■■■■■□□□] 70%</code>\n⌁ Verifying Telegram session...\n⌁ Loading hosting modules...",
+        "<b>DRAMAX // SYSTEM ONLINE</b>\n\n<code>[■■■■■■■■■■] 100%</code>\n⌁ Secure connection established ✓\n⌁ Hosting terminal ready ✓",
+    ]
+    animation = await chat.send_message(text=frames[0], parse_mode="HTML")
+    for frame in frames[1:]:
+        await asyncio.sleep(0.75)
+        try:
+            await animation.edit_text(frame, parse_mode="HTML")
+        except Exception:
+            log.debug("Could not update boot animation frame", exc_info=True)
+    await asyncio.sleep(0.45)
+    try:
+        await animation.delete()
+    except Exception:
+        pass
+    await _send_welcome(update, context)
+
 
 async def start_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data.pop("auth_state", None)
     context.user_data.pop("auth_mode", None)
+    if update.effective_message and update.effective_chat:
+        await _start_reaction(context, update.effective_chat.id, update.effective_message.message_id)
     if not await _require_subscription(update, context):
         return
-    await _send_welcome(update, context)
+    await _run_start_sequence(update, context)
 
 
 async def pannel_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -250,10 +292,15 @@ async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     data = query.data or ""
     if data == "force:check":
         if await _is_subscribed(update, context):
-            await query.answer("Verified!")
-            await _send_welcome(update, context)
+            await query.answer("Access verified ✓")
+            try:
+                await _start_reaction(context, query.message.chat_id, query.message.message_id)
+                await query.message.delete()
+            except Exception:
+                log.debug("Could not remove force-join prompt after verification", exc_info=True)
+            await _run_start_sequence(update, context)
         else:
-            await query.answer("Please join @drama_fonts first.", show_alert=True)
+            await query.answer("Please join the required channel first.", show_alert=True)
         return
     await query.answer()
     if data in ("welcome:expand", "welcome:collapse"):
@@ -362,8 +409,8 @@ async def auth_text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         db.link_telegram_account(user["id"], update.effective_chat.id)
         await update.effective_chat.send_message(
             f"🎉 *{ 'Account Created' if mode == 'signup' else 'Login Successful' }!*\n\n"
-            f"Welcome to GXHOST, *{username}* 💗\n\n"
-            "Your Telegram account is now connected with your GXHOST account.\n"
+            f"Welcome to Drama Hosting, *{username}* 💗\n\n"
+            "Your Telegram account is now connected with your Drama Hosting account.\n"
             "You can now upload and manage your bots from here. 🚀",
             parse_mode="Markdown",
             reply_markup=_user_keyboard(),
@@ -585,6 +632,9 @@ async def force_join_gate(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     if await _is_subscribed(update, context):
         return
+    incoming = update.effective_message
+    if incoming and incoming.text and incoming.text.split()[0].split("@")[0] == "/start":
+        await _start_reaction(context, update.effective_chat.id, incoming.message_id)
     await _require_subscription(update, context)
     raise ApplicationHandlerStop
 
