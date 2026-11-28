@@ -17,10 +17,24 @@ from __future__ import annotations
 import os
 import sqlite3
 import threading
+import logging
 from datetime import datetime, timezone
 from typing import Any, Iterable
 
 from werkzeug.security import check_password_hash, generate_password_hash
+
+try:
+    from pymongo import MongoClient, ASCENDING
+    from pymongo.errors import DuplicateKeyError, PyMongoError
+except ImportError:  # The dependency is listed in requirements.txt.
+    MongoClient = None
+    ASCENDING = 1
+    DuplicateKeyError = Exception
+    PyMongoError = Exception
+
+_LOG = logging.getLogger("dramax.accounts")
+_MONGO_CLIENT = None
+_MONGO_USERS = None
 
 _LOCK = threading.RLock()
 _DB_PATH: str | None = None
@@ -71,6 +85,7 @@ def init(db_path: str) -> None:
     os.makedirs(parent, exist_ok=True)
     with _connect() as con:
         con.executescript(SCHEMA)
+    _init_mongo_accounts()
 
 
 def _connect() -> sqlite3.Connection:
@@ -120,23 +135,118 @@ def _write(sql: str, params: Iterable[Any] = ()) -> int:
         return cur.lastrowid or cur.rowcount
 
 
+# ------------------------------------------------------- Mongo account store
+# Only account credentials/flags are mirrored. Bot files, uploads, logs and
+# bot records are intentionally never sent to MongoDB.
+def _mongo_config():
+    uri = (os.environ.get("MONGODB_URI") or os.environ.get("MONGO_URL") or "").strip()
+    name = (os.environ.get("MONGODB_DATABASE") or "dramax_accounts").strip()
+    return uri, name
+
+
+def _init_mongo_accounts() -> None:
+    global _MONGO_CLIENT, _MONGO_USERS
+    uri, name = _mongo_config()
+    if not uri:
+        _LOG.warning("MongoDB account persistence is DISABLED: set MONGODB_URI in Render")
+        return
+    if MongoClient is None:
+        raise RuntimeError("pymongo is missing; install requirements.txt")
+    try:
+        _MONGO_CLIENT = MongoClient(uri, serverSelectionTimeoutMS=10000, connectTimeoutMS=10000)
+        _MONGO_CLIENT.admin.command("ping")
+        _MONGO_USERS = _MONGO_CLIENT[name]["panel_accounts"]
+        _MONGO_USERS.create_index([("username", ASCENDING)], unique=True)
+        _restore_accounts_from_mongo()
+        _sync_local_accounts_to_mongo()
+        _LOG.info("MongoDB account persistence connected; account records synced")
+    except Exception as exc:
+        _MONGO_USERS = None
+        if _MONGO_CLIENT is not None:
+            _MONGO_CLIENT.close()
+            _MONGO_CLIENT = None
+        _LOG.exception("MongoDB account persistence initialization failed")
+        raise RuntimeError("MongoDB account persistence could not start. Check MONGODB_URI, database access and Atlas quota.") from exc
+
+
+def _restore_accounts_from_mongo() -> None:
+    if _MONGO_USERS is None:
+        return
+    docs = list(_MONGO_USERS.find({}, {"_id": 0}))
+    if not docs:
+        return
+    with _Cursor() as con:
+        for doc in docs:
+            username = str(doc.get("username") or "").strip()
+            password_hash = doc.get("password_hash")
+            if not username or not password_hash:
+                continue
+            existing = con.execute("SELECT id FROM users WHERE username = ?", (username,)).fetchone()
+            if existing:
+                con.execute(
+                    "UPDATE users SET password_hash=?, role=?, is_banned=?, is_admin=? WHERE username=?",
+                    (password_hash, doc.get("role", "user"), int(doc.get("is_banned", 0)),
+                     int(doc.get("is_admin", 0)), username),
+                )
+                continue
+            wanted_id = doc.get("id")
+            occupied = con.execute("SELECT username FROM users WHERE id=?", (wanted_id,)).fetchone() if wanted_id else None
+            created = doc.get("created_at") or utc_now()
+            if wanted_id and not occupied:
+                con.execute(
+                    "INSERT INTO users (id, username, password_hash, role, is_banned, is_admin, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                    (int(wanted_id), username, password_hash, doc.get("role", "user"),
+                     int(doc.get("is_banned", 0)), int(doc.get("is_admin", 0)), created),
+                )
+            else:
+                con.execute(
+                    "INSERT INTO users (username, password_hash, role, is_banned, is_admin, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+                    (username, password_hash, doc.get("role", "user"), int(doc.get("is_banned", 0)),
+                     int(doc.get("is_admin", 0)), created),
+                )
+
+
+def _sync_local_accounts_to_mongo() -> None:
+    if _MONGO_USERS is None:
+        return
+    for user in list_users():
+        doc = {key: user[key] for key in _USER_FIELDS}
+        _MONGO_USERS.replace_one({"username": doc["username"]}, doc, upsert=True)
+
+
+_USER_FIELDS = ("id", "username", "password_hash", "role", "is_banned", "is_admin", "created_at")
+
+
+def _mongo_save_user(user: sqlite3.Row) -> None:
+    if _MONGO_USERS is None:
+        return
+    doc = {key: user[key] for key in _USER_FIELDS}
+    _MONGO_USERS.replace_one({"username": doc["username"]}, doc, upsert=True)
+
+
 # ----------------------------------------------------------------- users
 
 
 def create_user(username: str, password: str, role: str = "user") -> int | None:
-    """Insert a user. Returns the new id, or None when the name is taken."""
-    uid = _write(
-        "INSERT INTO users (username, password_hash, role, is_admin, created_at) "
-        "VALUES (?, ?, ?, ?, ?)",
-        (
-            username,
-            generate_password_hash(password),
-            role,
-            1 if role == "admin" else 0,
-            utc_now(),
-        ),
-    )
-    return uid or None
+    """Create a local account and persist its password hash to MongoDB."""
+    try:
+        uid = _write(
+            "INSERT INTO users (username, password_hash, role, is_admin, created_at) VALUES (?, ?, ?, ?, ?)",
+            (username, generate_password_hash(password), role, 1 if role == "admin" else 0, utc_now()),
+        )
+    except sqlite3.IntegrityError:
+        return None
+    if not uid:
+        return None
+    try:
+        user = get_user(int(uid))
+        if user is not None:
+            _mongo_save_user(user)
+        return int(uid)
+    except Exception:
+        _write("DELETE FROM users WHERE id = ?", (int(uid),))
+        _LOG.exception("Could not persist newly-created account to MongoDB")
+        return None
 
 
 def get_user_by_name(username: str) -> sqlite3.Row | None:
@@ -167,9 +277,15 @@ def list_users() -> list[sqlite3.Row]:
 
 def set_user_banned(user_id: int, banned: bool) -> None:
     _write("UPDATE users SET is_banned = ? WHERE id = ?", (1 if banned else 0, user_id))
+    user = get_user(user_id)
+    if user is not None:
+        _mongo_save_user(user)
 
 
 def delete_user(user_id: int) -> None:
+    user = get_user(user_id)
+    if user is not None and _MONGO_USERS is not None:
+        _MONGO_USERS.delete_one({"username": user["username"]})
     with _Cursor() as con:
         con.execute("DELETE FROM bots WHERE user_id = ?", (user_id,))
         con.execute("DELETE FROM users WHERE id = ?", (user_id,))
@@ -303,25 +419,7 @@ def init_telegram_tables() -> None:
             linked_at TEXT NOT NULL,
             FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
         );
-        CREATE TABLE IF NOT EXISTS app_settings (
-            setting_key TEXT PRIMARY KEY,
-            setting_value TEXT NOT NULL,
-            updated_at TEXT NOT NULL
-        );
         """)
-
-
-def get_setting(key: str, default: str = "") -> str:
-    row = _one("SELECT setting_value FROM app_settings WHERE setting_key = ?", (key,))
-    return str(row["setting_value"]) if row else default
-
-
-def set_setting(key: str, value: str) -> None:
-    _write(
-        "INSERT INTO app_settings(setting_key, setting_value, updated_at) VALUES (?, ?, ?) "
-        "ON CONFLICT(setting_key) DO UPDATE SET setting_value=excluded.setting_value, updated_at=excluded.updated_at",
-        (key, value, utc_now()),
-    )
 
 
 def create_telegram_pair_code(user_id: int, code: str, expires_at: int) -> None:
