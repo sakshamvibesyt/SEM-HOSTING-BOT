@@ -42,13 +42,41 @@ from flask import (
 
 import botmanager
 import db
+import backup
 
 load_dotenv()
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
+DATA_DIR = os.path.join(BASE_DIR, os.environ.get("DATA_DIR", "data"))
+os.makedirs(DATA_DIR, exist_ok=True)
+# Restore the MongoDB snapshot before SQLite schema initialization on a fresh
+# deployment. Existing local data is never overwritten by an older snapshot.
+backup.restore_if_needed(DATA_DIR)
+
+
+def _stable_secret_key() -> str:
+    configured = os.environ.get("FLASK_SECRET_KEY", "").strip()
+    if configured:
+        return configured
+    key_path = os.path.join(DATA_DIR, "flask_secret.key")
+    try:
+        with open(key_path, "r", encoding="utf-8") as handle:
+            key = handle.read().strip()
+        if key:
+            return key
+    except FileNotFoundError:
+        pass
+    key = secrets.token_urlsafe(48)
+    temp_path = key_path + ".tmp"
+    with open(temp_path, "w", encoding="utf-8") as handle:
+        handle.write(key)
+    os.replace(temp_path, key_path)
+    return key
+
+
 app = Flask(__name__, template_folder="templates", static_folder=None)
-app.secret_key = os.environ.get("FLASK_SECRET_KEY") or os.urandom(32)
+app.secret_key = _stable_secret_key()
 app.config.update(
     SESSION_COOKIE_HTTPONLY=True,
     SESSION_COOKIE_SAMESITE="Lax",
@@ -57,7 +85,6 @@ app.config.update(
     MAX_CONTENT_LENGTH=int(os.environ.get("MAX_UPLOAD_MB", "20")) * 1024 * 1024,
 )
 
-DATA_DIR = os.path.join(BASE_DIR, os.environ.get("DATA_DIR", "data"))
 ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "")
 
 db.init(os.path.join(DATA_DIR, "panel.db"))
@@ -73,9 +100,18 @@ botmanager.configure(
 # supervised, so clear those rows before the dashboard can show them as running.
 botmanager.reconcile_on_boot()
 botmanager.start_monitor()
+backup.start(DATA_DIR)
+atexit.register(backup.stop)
 atexit.register(botmanager.shutdown)
 
 USERNAME_RE = re.compile(r"^[A-Za-z0-9_.-]{3,32}$")
+
+
+@app.after_request
+def _schedule_persistent_backup(response):
+    if request.method in {"POST", "PUT", "PATCH", "DELETE"} and response.status_code < 400:
+        backup.request_backup()
+    return response
 
 
 # --------------------------------------------------------------------- auth
@@ -194,8 +230,9 @@ def inject_globals() -> dict[str, Any]:
         "current_user": user,
         "avatar_letter": (user["username"][0].upper() if user else "?"),
         "is_admin": admin_unlocked() if user else False,
-        "panel_name": "GX",
-        "panel_tagline": "Bot Hosting",
+        "panel_name": os.environ.get("PANEL_NAME", "❛ ⤹⌯ ᯓ𓆰 𝐃 ꧊᱂ ᧘ ϻ ᧘ 𖤍 ➛🇨🇦 Hosting"),
+        "panel_tagline": os.environ.get("PANEL_TAGLINE", "SECURE BOT HOSTING"),
+        "support_url": os.environ.get("SUPPORT_URL", "https://t.me/drama_404x"),
     }
 
 

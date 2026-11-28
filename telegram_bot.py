@@ -591,7 +591,7 @@ async def force_join_gate(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 def start_telegram_bot(flask_app) -> None:
     """Start polling in a daemon thread when TELEGRAM_BOT_TOKEN is configured."""
-    token = os.environ.get("TELEGRAM_BOT_TOKEN", "").strip()
+    token = (os.environ.get("TELEGRAM_BOT_TOKEN") or os.environ.get("BOT_TOKEN") or "").strip()
     if not token:
         log.info("TELEGRAM_BOT_TOKEN not set; Telegram control bot disabled")
         return

@@ -54,7 +54,12 @@ All settings are environment variables (`.env` is read at startup).
 | `MONITOR_INTERVAL` | `3` | Seconds between child-process liveness checks. |
 | `COOKIE_SECURE` | `0` | Set to `1` when served over HTTPS. |
 | `INHERIT_ENV` | `0` | `1` lets bots inherit the panel's environment instead of a clean one. |
-| `TELEGRAM_BOT_TOKEN` | empty | Optional Telegram control bot token from @BotFather. |
+| `TELEGRAM_BOT_TOKEN` / `BOT_TOKEN` | empty | Telegram control bot token. `TELEGRAM_BOT_TOKEN` takes priority. |
+| `MONGODB_URI` / `MONGO_URL` | empty | MongoDB connection URI for GridFS snapshots; required for remote backups. |
+| `MONGODB_DATABASE` | `gx_hosting` | MongoDB database used for backups. |
+| `BACKUP_INTERVAL_SECONDS` | `300` | Full snapshot interval (minimum 60 seconds). |
+| `BACKUP_KEEP_COUNT` | `24` | Number of recent snapshots retained. |
+| `SUPPORT_URL` | `https://t.me/drama_404x` | Support link shown beside Logout. |
 
 ---
 
@@ -241,3 +246,24 @@ Set these environment variables on Render:
 In Telegram, `/start` displays Login and Sign Up. Both use the same account database as the website panel. A successful Telegram login links that Telegram chat to the matching panel account. `/pannel` (or `/panel`) sends the panel URL with an Open Panel button.
 
 For account security, the bot attempts to delete the password message after processing it. Telegram message deletion is best-effort; do not use a password that you share with other services.
+
+
+## Durable MongoDB backups
+
+The panel continues to use SQLite locally, while `backup.py` stores compressed
+full snapshots in MongoDB GridFS. Each snapshot contains the SQLite account/bot
+records, uploaded bot folders, logs, and the stable Flask session key. On a
+fresh deployment with no local `panel.db`, the newest snapshot is restored
+before the database schema is initialized. Existing local data is not replaced
+by an older remote snapshot. Successful write requests schedule a snapshot; a
+background worker also snapshots every `BACKUP_INTERVAL_SECONDS`, and graceful
+shutdown requests a final snapshot. Keep `MONGODB_URI` private and use a MongoDB
+user restricted to the backup database. Passwords are stored as password hashes,
+not plaintext.
+
+For a production deployment, set `FLASK_SECRET_KEY` to a long random value and
+set `MONGODB_URI` plus the new `TELEGRAM_BOT_TOKEN` in the hosting platform's
+private Environment Variables. Do not commit tokens or MongoDB credentials.
+The panel still requires one web worker/instance because bot processes are
+supervised locally. MongoDB protects accounts and files; it does not migrate
+running OS processes, so bots will need to be started again after a redeploy.

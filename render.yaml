@@ -33,13 +33,23 @@ services:
         value: "1"
       - key: TELEGRAM_BOT_TOKEN
         sync: false
+      - key: MONGODB_URI
+        sync: false
+      - key: MONGODB_DATABASE
+        value: gx_hosting
+      - key: BACKUP_INTERVAL_SECONDS
+        value: "300"
+      - key: BACKUP_KEEP_COUNT
+        value: "24"
+      - key: PANEL_NAME
+        value: "❛ ⤹⌯ ᯓ𓆰 𝐃 ꧊᱂ ᧘ ϻ ᧘ 𖤍 ➛🇨🇦 Hosting"
+      - key: SUPPORT_URL
+        value: "https://t.me/drama_404x"
       - key: PANEL_URL
         value: "https://sem-hosting-bot.onrender.com/"
       - key: WELCOME_VIDEO_URL
         sync: false
       - key: UPDATES_URL
-        sync: false
-      - key: SUPPORT_URL
         sync: false
       - key: OWNER_USERNAME
         value: "drama_404x"
