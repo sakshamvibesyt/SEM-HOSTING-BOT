@@ -59,6 +59,7 @@
                 <div class="user-name">{{ current_user['username'] }}</div>
                 <div class="user-role">{{ 'Admin' if current_user['role'] == 'admin' else 'User' }}</div>
             </div>
+            <a href="{{ support_url }}" class="support-btn" title="Support" target="_blank" rel="noopener noreferrer"><i class="fas fa-headset"></i></a>
             <a href="{{ url_for('logout') }}" class="logout-btn" title="Logout"><i class="fas fa-sign-out-alt"></i></a>
         </div>
     </div>
