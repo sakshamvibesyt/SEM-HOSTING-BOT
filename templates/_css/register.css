@@ -274,3 +274,69 @@
     border-color: var(--cyan-core);
     color: var(--cyan-core);
 }
+
+
+/* DRAMAX MATRIX AUTH THEME */
+.matrix-auth-page {
+    isolation: isolate;
+    background: radial-gradient(ellipse at 50% 45%, #071b10 0%, #030806 55%, #010302 100%) !important;
+}
+.matrix-auth-page::before {
+    content: ""; position: absolute; inset: 0; z-index: 0; pointer-events: none;
+    background: linear-gradient(rgba(20, 255, 115, .025) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(20, 255, 115, .025) 1px, transparent 1px);
+    background-size: 38px 38px;
+    mask-image: linear-gradient(to bottom, transparent, #000 18%, #000 82%, transparent);
+}
+.matrix-rain { position: absolute; inset: 0; z-index: 0; pointer-events: none; opacity: .55; }
+.matrix-auth-page .login-card {
+    z-index: 2; position: relative;
+    background: rgba(5, 13, 9, .91) !important;
+    border: 1px solid rgba(35, 230, 112, .28) !important;
+    box-shadow: 0 22px 70px rgba(0,0,0,.78), 0 0 34px rgba(22,220,96,.10), inset 0 1px rgba(180,255,205,.06) !important;
+    backdrop-filter: blur(15px); -webkit-backdrop-filter: blur(15px);
+}
+.matrix-auth-page .login-card:hover { border-color: rgba(48,255,128,.48) !important; }
+.matrix-auth-page .logo-icon {
+    color: #041008 !important;
+    background: linear-gradient(145deg, #8dffb5, #16c85d) !important;
+    box-shadow: 0 0 24px rgba(22,220,96,.35) !important;
+}
+.matrix-auth-page .logo-text {
+    color: #e8fff0 !important; font-size: clamp(17px, 4.4vw, 22px) !important;
+    line-height: 1.35; letter-spacing: .15px; overflow-wrap: anywhere;
+    text-shadow: 0 0 18px rgba(35,255,117,.22);
+}
+.matrix-auth-page .logo-subtitle { color: #42e982 !important; letter-spacing: 2px; }
+.matrix-auth-page .form-label, .matrix-auth-page .cyber-label { color: #a8cbb4 !important; }
+.matrix-auth-page .form-input, .matrix-auth-page .cyber-input {
+    color: #eaffef !important; background: rgba(0,0,0,.58) !important;
+    border: 1px solid rgba(92,160,112,.25) !important;
+}
+.matrix-auth-page .form-input:focus, .matrix-auth-page .cyber-input:focus {
+    border-color: #27e875 !important; box-shadow: 0 0 0 3px rgba(39,232,117,.10), 0 0 18px rgba(39,232,117,.13) !important;
+}
+.matrix-auth-page input::placeholder { color: #789482 !important; }
+.matrix-auth-page .btn-primary, .matrix-auth-page .btn-launch {
+    color: #031008 !important; background: linear-gradient(110deg, #a4ffc1, #27e875 58%, #0bbd58) !important;
+    box-shadow: 0 0 24px rgba(32,220,103,.22) !important;
+}
+.matrix-auth-page .btn-secondary, .matrix-auth-page .btn-ghost-login {
+    color: #dfffea !important; background: rgba(25,75,42,.22) !important;
+    border: 1px solid rgba(68,205,111,.24) !important;
+}
+.matrix-auth-page .btn-secondary:hover, .matrix-auth-page .btn-ghost-login:hover {
+    color: #8dffb5 !important; border-color: #27e875 !important; background: rgba(25,125,60,.18) !important;
+}
+.matrix-auth-page .login-divider, .matrix-auth-page .cyber-divider,
+.matrix-auth-page .text-secondary, .matrix-auth-page p { color: #91ad9a !important; }
+@media (max-width: 480px) {
+    .matrix-auth-page { padding: 18px 12px !important; }
+    .matrix-auth-page .login-card { padding: 30px 22px !important; border-radius: 23px !important; }
+    .matrix-auth-page .logo-text { font-size: 17px !important; }
+}
+@media (prefers-reduced-motion: reduce) {
+    .matrix-rain { display: none; }
+    .matrix-auth-page * { animation-duration: .01ms !important; transition-duration: .01ms !important; }
+}
+
