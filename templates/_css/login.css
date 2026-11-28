@@ -77,9 +77,13 @@
 .logo-text {
     font-size: 22px;
     font-weight: 800;
-    letter-spacing: 0.5px;
+    letter-spacing: 0.2px;
     color: #fff;
-    margin-bottom: 4px;
+    margin: 0 auto 4px;
+    max-width: 100%;
+    line-height: 1.35;
+    overflow-wrap: anywhere;
+    text-wrap: balance;
 }
 
 .logo-subtitle {
